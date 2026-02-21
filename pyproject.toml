@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gpu-profile"
+version = "0.2.0"
+description = "Programmatic GPU utilization profiler (NVML / nvidia-smi) with decorator + context manager."
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [{name = "YOUR NAME", email = "you@example.com"}]
+keywords = ["gpu", "nvidia", "nvml", "profiling", "utilization", "monitoring"]
+classifiers = [
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Operating System :: OS Independent",
+]
+
+# Keep the default install dependency-light.
+dependencies = []
+
+[project.optional-dependencies]
+# Best backend: low-overhead sampling via NVML.
+nvml = ["nvidia-ml-py3>=7.352.0"]
+
+# Development tooling (tests + lint).
+dev = [
+  "pytest>=7",
+  "ruff>=0.4",
+]
+
+# Documentation tooling (optional). Not required for runtime.
+docs = [
+  "mkdocs>=1.5",
+  "mkdocs-material>=9.5",
+  "mkdocstrings[python]>=0.24",
+]
+
+# Notebook tooling (optional). Not required for runtime.
+notebooks = [
+  "jupyterlab>=4",
+  "ipykernel>=6",
+  "matplotlib>=3",
+]
+
+[project.scripts]
+gpu-profile = "gpu_profile.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/<you>/gpu-profile"
+Repository = "https://github.com/<you>/gpu-profile"
+Issues = "https://github.com/<you>/gpu-profile/issues"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
