@@ -14,7 +14,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from gpu_profile import GpuMonitor
+from profgpu import GpuMonitor
 
 
 class SmallMLP(nn.Module):

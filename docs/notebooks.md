@@ -43,10 +43,10 @@ jupyter lab
   - Shows how to measure correctly.
 
 - **04_CLI_Profile_Command.ipynb**
-  - Runs the `gpu-profile` CLI from a notebook and parses JSON output.
+  - Runs the `profgpu` CLI from a notebook and parses JSON output.
 
 - **05_Export_Samples_and_Plot.ipynb**
-  - Collects raw samples (`keep_samples=True`), exports to CSV, and plots `util.gpu` over time.
+  - Collects raw samples (`store_samples=True`), exports to CSV, and plots `util.gpu` over time.
 
 - **06_CuPy_Benchmark.ipynb**
   - Minimal CuPy example showing `sync_fn=cp.cuda.Stream.null.synchronize`.

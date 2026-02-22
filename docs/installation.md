@@ -13,7 +13,7 @@
 Once you push this repo to GitHub:
 
 ```bash
-pip install git+https://github.com/<you>/gpu-profile.git
+pip install git+https://github.com/<you>/profgpu.git
 ```
 
 ### Recommended: install NVML support
@@ -21,7 +21,7 @@ pip install git+https://github.com/<you>/gpu-profile.git
 NVML is the lowest overhead backend.
 
 ```bash
-pip install "gpu-profile[nvml] @ git+https://github.com/<you>/gpu-profile.git"
+pip install "profgpu[nvml] @ git+https://github.com/<you>/profgpu.git"
 ```
 
 ## Install from a wheel (air-gapped / cluster environments)
@@ -35,7 +35,7 @@ python -m pip wheel . -w dist
 Copy the `.whl` to your target environment and install:
 
 ```bash
-pip install gpu_profile-*.whl
+pip install profgpu-*.whl
 ```
 
 If you want NVML support in that target environment, also install:
@@ -51,18 +51,50 @@ pip install -e .[dev]
 pytest
 ```
 
+## Conda environment (recommended for old host toolchains)
+
+If your system has an outdated GCC or CUDA, the repo includes
+`create_env.sh` which creates a self-contained Conda environment with a
+modern GCC toolchain and matching CUDA toolkit:
+
+```bash
+bash create_env.sh                # creates 'profgpu'
+conda activate profgpu
+pytest
+```
+
+You can customise the environment name, Python version, CUDA version,
+and GCC version via environment variables:
+
+```bash
+ENV_NAME=myenv PYTHON=3.11 CUDA_VERSION=12.4 GCC_VERSION=13 bash create_env.sh
+```
+
+## Docker
+
+The repo includes a `Dockerfile` using an NVIDIA CUDA base image.
+This entirely bypasses host compiler and CUDA compatibility issues:
+
+```bash
+docker build -t profgpu:latest .
+docker run --rm --gpus all profgpu:latest pytest
+docker run --rm -it --gpus all profgpu:latest bash
+```
+
+> Requires the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/).
+
 ## Verify installation
 
 ### 1) Import the package
 
 ```bash
-python -c "from gpu_profile import GpuMonitor; print('ok')"
+python -c "from profgpu import GpuMonitor; print('ok')"
 ```
 
 ### 2) Check the CLI is available
 
 ```bash
-gpu-profile --help
+profgpu --help
 ```
 
 ### 3) Quick smoke test (no GPU work required)
@@ -70,7 +102,7 @@ gpu-profile --help
 On an NVIDIA machine, this should print a summary (values may be low/idle):
 
 ```bash
-gpu-profile --interval 0.5 -- python -c "import time; time.sleep(2)"
+profgpu --interval 0.5 -- python -c "import time; time.sleep(2)"
 ```
 
 ## Backend selection

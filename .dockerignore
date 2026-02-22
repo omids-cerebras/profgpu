@@ -1,0 +1,39 @@
+# Prevent Docker from copying unnecessary files into the build context.
+# This speeds up builds and keeps images small.
+
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Version control
+.git/
+.gitignore
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE / editor artifacts
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# Docs build output
+site/
+
+# Docker-in-Docker (avoid recursion)
+Dockerfile
+docker-compose*.yml

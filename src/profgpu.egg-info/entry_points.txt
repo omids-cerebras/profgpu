@@ -1,0 +1,2 @@
+[console_scripts]
+profgpu = profgpu.cli:main

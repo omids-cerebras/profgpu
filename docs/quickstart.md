@@ -10,7 +10,7 @@ This page shows the most common usage patterns:
 ## 1) Decorator
 
 ```python
-from gpu_profile import gpu_profile
+from profgpu import gpu_profile
 
 @gpu_profile(interval_s=0.2)
 def work():
@@ -30,7 +30,7 @@ If you want “the function call” to include queued GPU work, pass a synchroni
 
 ```python
 import torch
-from gpu_profile import gpu_profile
+from profgpu import gpu_profile
 
 @gpu_profile(interval_s=0.1, sync_fn=torch.cuda.synchronize, warmup_s=0.2)
 def bench():
@@ -47,7 +47,7 @@ bench()
 Use the context manager when you want to profile arbitrary blocks of code:
 
 ```python
-from gpu_profile import GpuMonitor
+from profgpu import GpuMonitor
 
 with GpuMonitor(device=0, interval_s=0.2) as mon:
     ...
@@ -60,7 +60,7 @@ print(mon.summary.format())
 Set `report=False` to disable printing, and `return_profile=True` to get a structured result:
 
 ```python
-from gpu_profile import gpu_profile
+from profgpu import gpu_profile
 
 @gpu_profile(report=False, return_profile=True)
 def work():
@@ -78,7 +78,7 @@ The `report` parameter can also be a callable. It receives a `GpuSummary`.
 
 ```python
 import json
-from gpu_profile import gpu_profile
+from profgpu import gpu_profile
 
 def write_jsonl(summary):
     with open("gpu_stats.jsonl", "a") as f:
@@ -96,13 +96,13 @@ work()
 Profile an external command:
 
 ```bash
-gpu-profile --device 0 --interval 0.2 -- python train.py --epochs 3
+profgpu --device 0 --interval 0.2 -- python train.py --epochs 3
 ```
 
 Emit JSON:
 
 ```bash
-gpu-profile --json -- python train.py
+profgpu --json -- python train.py
 ```
 
 See [CLI Tutorial](tutorials/cli.md) for patterns like profiling shell pipelines and handling exit codes.

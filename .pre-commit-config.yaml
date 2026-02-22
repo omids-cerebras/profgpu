@@ -1,0 +1,37 @@
+# See https://pre-commit.com for docs
+# Install:  pip install pre-commit && pre-commit install
+# Run all:  pre-commit run --all-files
+repos:
+  # ---- General file hygiene ----
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+      - id: check-merge-conflict
+      - id: debug-statements
+
+  # ---- Ruff: lint + format (replaces flake8/isort/black) ----
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.7
+    hooks:
+      # Linter (runs first so auto-fixes land before the formatter)
+      - id: ruff
+        args: ["--fix", "--exit-non-zero-on-fix"]
+      # Formatter (PEP 8, deterministic)
+      - id: ruff-format
+
+  # ---- Type checking (optional, advisory) ----
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.14.1
+    hooks:
+      - id: mypy
+        additional_dependencies: []
+        args: ["--ignore-missing-imports"]
+        # Only check source; skip tests/notebooks/examples.
+        files: ^src/

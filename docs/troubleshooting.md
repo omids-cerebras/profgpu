@@ -2,7 +2,7 @@
 
 ## “No backend available” / `GpuBackendError`
 
-By default, `gpu-profile` uses `backend="auto"`:
+By default, `profgpu` uses `backend="auto"`:
 
 1. try NVML (requires `nvidia-ml-py3`)
 2. fall back to `nvidia-smi`
@@ -12,7 +12,7 @@ If neither is available, and `strict=True`, you’ll see an error.
 ### Fix: install NVML support
 
 ```bash
-pip install gpu-profile[nvml]
+pip install profgpu[nvml]
 ```
 
 ### Fix: ensure `nvidia-smi` is on PATH
@@ -74,7 +74,7 @@ For deeper analysis, use Nsight Systems/Compute.
 
 WSL2 with NVIDIA GPU support generally provides `nvidia-smi` and NVML, but driver/tooling must be installed correctly.
 
-If `nvidia-smi` works inside WSL, `gpu-profile` should work.
+If `nvidia-smi` works inside WSL, `profgpu` should work.
 
 ## MIG / multi-instance GPUs
 
@@ -88,7 +88,7 @@ Device indexing and utilization reporting can be different under MIG.
 If you hit an issue not covered here, include:
 
 - `nvidia-smi` output
-- whether you installed `gpu-profile[nvml]`
+- whether you installed `profgpu[nvml]`
 - OS + driver version
 - whether you are in Docker/WSL
 

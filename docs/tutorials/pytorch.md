@@ -8,7 +8,7 @@ This tutorial shows practical patterns for profiling PyTorch workloads.
 
 ```python
 import torch
-from gpu_profile import gpu_profile
+from profgpu import gpu_profile
 
 # Ensures the region includes queued GPU work.
 SYNC = torch.cuda.synchronize
@@ -42,7 +42,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from gpu_profile import GpuMonitor
+from profgpu import GpuMonitor
 
 SYNC = torch.cuda.synchronize
 
@@ -101,7 +101,7 @@ If you want to measure a single batch step, keep the sampling interval small and
 For example:
 
 ```python
-from gpu_profile import GpuMonitor
+from profgpu import GpuMonitor
 import torch
 
 SYNC = torch.cuda.synchronize
@@ -125,7 +125,7 @@ A common question is:
 You can measure two regions separately:
 
 ```python
-from gpu_profile import GpuMonitor
+from profgpu import GpuMonitor
 import torch
 
 SYNC = torch.cuda.synchronize

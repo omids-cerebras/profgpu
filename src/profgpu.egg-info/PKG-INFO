@@ -1,3 +1,36 @@
+Metadata-Version: 2.4
+Name: profgpu
+Version: 0.2.0
+Summary: Programmatic GPU utilization profiler (NVML / nvidia-smi) with decorator + context manager.
+Author-email: YOUR NAME <you@example.com>
+License: MIT
+Project-URL: Homepage, https://github.com/<you>/profgpu
+Project-URL: Repository, https://github.com/<you>/profgpu
+Project-URL: Issues, https://github.com/<you>/profgpu/issues
+Keywords: gpu,nvidia,nvml,profiling,utilization,monitoring
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Provides-Extra: nvml
+Requires-Dist: nvidia-ml-py3>=7.352.0; extra == "nvml"
+Provides-Extra: dev
+Requires-Dist: pytest>=7; extra == "dev"
+Requires-Dist: ruff>=0.4; extra == "dev"
+Requires-Dist: pre-commit>=3.6; extra == "dev"
+Provides-Extra: docs
+Requires-Dist: mkdocs>=1.5; extra == "docs"
+Requires-Dist: mkdocs-material>=9.5; extra == "docs"
+Requires-Dist: mkdocstrings[python]>=0.24; extra == "docs"
+Provides-Extra: notebooks
+Requires-Dist: jupyterlab>=4; extra == "notebooks"
+Requires-Dist: ipykernel>=6; extra == "notebooks"
+Requires-Dist: matplotlib>=3; extra == "notebooks"
+Dynamic: license-file
+
 # profgpu
 
 Programmatic GPU utilization profiling for Python:

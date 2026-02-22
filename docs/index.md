@@ -1,6 +1,6 @@
-# gpu-profile
+# profgpu
 
-`gpu-profile` is a small, dependency-light library for **sampling GPU utilization** while your Python code (or an external command) runs.
+`profgpu` is a small, dependency-light library for **sampling GPU utilization** while your Python code (or an external command) runs.
 
 It is designed for two common workflows:
 
@@ -9,8 +9,8 @@ It is designed for two common workflows:
    - A context manager (`with GpuMonitor(...)`) for wrapping an arbitrary block.
 
 2. **CLI mode** (profile a subprocess)
-   - `gpu-profile -- python train.py ...` prints a summary at the end.
-   - `gpu-profile --json -- ...` emits machine-friendly JSON.
+   - `profgpu -- python train.py ...` prints a summary at the end.
+   - `profgpu --json -- ...` emits machine-friendly JSON.
 
 ## What it measures
 
@@ -30,10 +30,10 @@ Optionally (depending on backend / driver support) it also samples:
 
 ## Backends
 
-`gpu-profile` supports:
+`profgpu` supports:
 
 - **NVML** (recommended): low overhead, robust, fast polling.
-  - Install: `pip install gpu-profile[nvml]`
+  - Install: `pip install profgpu[nvml]`
 - **nvidia-smi** fallback: works if `nvidia-smi` exists, but calls an external process each sample.
 
 Today the package targets **NVIDIA** GPUs (NVML / nvidia-smi). The public API is backend-agnostic, so additional backends (AMD/Intel) can be added later.
@@ -41,7 +41,7 @@ Today the package targets **NVIDIA** GPUs (NVML / nvidia-smi). The public API is
 ## Quick example
 
 ```python
-from gpu_profile import gpu_profile
+from profgpu import gpu_profile
 
 @gpu_profile(interval_s=0.2)
 def work():
@@ -55,7 +55,7 @@ If you’re using a framework that schedules GPU work asynchronously (e.g. **PyT
 
 ```python
 import torch
-from gpu_profile import gpu_profile
+from profgpu import gpu_profile
 
 @gpu_profile(interval_s=0.1, sync_fn=torch.cuda.synchronize, warmup_s=0.2)
 def matmul_bench():

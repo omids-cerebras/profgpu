@@ -1,6 +1,6 @@
 # Concepts
 
-This section explains what `gpu-profile` is (and is **not**) measuring, and why the defaults are the way they are.
+This section explains what `profgpu` is (and is **not**) measuring, and why the defaults are the way they are.
 
 ## Device-level utilization is a time fraction
 
@@ -28,7 +28,7 @@ A utilization counter is a *statistic over time*. If your workload is bursty (sh
 - With a long interval (e.g. 1s), bursts may be averaged out.
 - With a short interval (e.g. 50ms), you can see bursts more clearly.
 
-`gpu-profile` defaults to `interval_s=0.2` (200ms) because it's usually:
+`profgpu` defaults to `interval_s=0.2` (200ms) because it's usually:
 
 - fast enough to show “bursty vs steady” patterns
 - slow enough to avoid noticeable overhead in most runs
@@ -61,7 +61,7 @@ That means a function can return before the GPU finishes the work it launched.
 
 ### What `sync_fn` does
 
-`gpu-profile` can call a synchronization function **before and after** the profiled region:
+`profgpu` can call a synchronization function **before and after** the profiled region:
 
 - before: flush previously queued work so you don’t “inherit” earlier activity
 - after: wait for queued work so the region includes what you launched
@@ -106,7 +106,7 @@ If you need per-process attribution, you typically need:
 - DCGM-based accounting
 - or application-level instrumentation
 
-`gpu-profile` intentionally focuses on “is the device busy?” rather than perfect attribution.
+`profgpu` intentionally focuses on “is the device busy?” rather than perfect attribution.
 
 ## Interpreting common patterns
 

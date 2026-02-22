@@ -3,7 +3,7 @@
 The public API is intentionally small.
 
 ```python
-from gpu_profile import (
+from profgpu import (
     gpu_profile,
     GpuMonitor,
     GpuSummary,
@@ -22,7 +22,7 @@ Signature (simplified):
     device: int = 0,
     interval_s: float = 0.2,
     backend: str = "auto",   # "auto" | "nvml" | "smi" | "none"
-    strict: bool = True,
+    strict: bool = False,
     sync_fn: Optional[Callable[[], None]] = None,
     warmup_s: float = 0.0,
     report: Union[bool, Callable[[GpuSummary], None]] = True,
@@ -73,7 +73,8 @@ summary = mon.summary
 
 Additionally:
 
-- `keep_samples`: whether to retain full samples in memory.
+- `store_samples`: whether to retain full :class:`GpuSample` objects in memory.
+- `max_samples`: cap on stored samples before automatic 2× down-sampling.
 
 ### Attributes
 

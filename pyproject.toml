@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "gpu-profile"
+name = "profgpu"
 version = "0.2.0"
 description = "Programmatic GPU utilization profiler (NVML / nvidia-smi) with decorator + context manager."
 readme = "README.md"
@@ -29,6 +29,7 @@ nvml = ["nvidia-ml-py3>=7.352.0"]
 dev = [
   "pytest>=7",
   "ruff>=0.4",
+  "pre-commit>=3.6",
 ]
 
 # Documentation tooling (optional). Not required for runtime.
@@ -46,12 +47,12 @@ notebooks = [
 ]
 
 [project.scripts]
-gpu-profile = "gpu_profile.cli:main"
+profgpu = "profgpu.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/<you>/gpu-profile"
-Repository = "https://github.com/<you>/gpu-profile"
-Issues = "https://github.com/<you>/gpu-profile/issues"
+Homepage = "https://github.com/<you>/profgpu"
+Repository = "https://github.com/<you>/profgpu"
+Issues = "https://github.com/<you>/profgpu/issues"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -62,3 +63,47 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+# ---------------------------------------------------------------------------
+# Ruff (linter + formatter)
+# ---------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py38"
+line-length = 100
+src = ["src"]
+
+[tool.ruff.lint]
+select = [
+  "E",   # pycodestyle errors
+  "W",   # pycodestyle warnings
+  "F",   # pyflakes
+  "I",   # isort
+  "UP",  # pyupgrade
+  "B",   # flake8-bugbear
+  "SIM", # flake8-simplify
+  "RUF", # ruff-specific rules
+]
+ignore = [
+  "E501",   # line too long (formatter handles it)
+  "UP007",  # Use X | Y for union types (we support 3.8)
+  "UP006",  # Use builtin dict/list (we support 3.8 without __future__.annotations everywhere)
+  "UP045",  # Use X | None instead of Optional[X] (requires 3.10+)
+  "RUF002", # ambiguous unicode chars — intentional (°C, sparkline blocks)
+  "RUF003", # ambiguous unicode chars in comments — intentional
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["profgpu"]
+
+[tool.ruff.lint.per-file-ignores]
+# Nested `with mock.patch(...)` is idiomatic in tests; don't force combining.
+"tests/*" = ["SIM117"]
+
+# ---------------------------------------------------------------------------
+# Mypy
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true

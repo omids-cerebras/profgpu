@@ -1,5 +1,6 @@
 import torch
-from gpu_profile import gpu_profile
+
+from profgpu import gpu_profile
 
 
 @gpu_profile(interval_s=0.1, sync_fn=torch.cuda.synchronize, warmup_s=0.2)

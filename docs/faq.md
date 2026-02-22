@@ -52,7 +52,7 @@ You can run without NVML if `nvidia-smi` is available, but NVML is recommended b
 Install NVML support via:
 
 ```bash
-pip install gpu-profile[nvml]
+pip install profgpu[nvml]
 ```
 
 ## Will this slow down my training?
@@ -64,22 +64,22 @@ Usually the overhead is negligible at typical sampling intervals.
 
 If you care about overhead:
 
-- use NVML (`gpu-profile[nvml]`)
+- use NVML (`profgpu[nvml]`)
 - keep `interval_s` reasonable (e.g., 0.1–1.0)
 - profile longer regions (epochs) rather than tiny micro-regions
 
 ## Can I export a time series, not just aggregates?
 
-Yes. Use the context manager with `keep_samples=True` and write `mon.samples` to CSV/JSON.
+Yes. Use the context manager with `store_samples=True` and write `mon.samples` to CSV/JSON.
 
 See [Logging & export](tutorials/logging.md).
 
 ## How does this differ from Nsight Systems / Nsight Compute?
 
-- `gpu-profile` answers: **“Is the device busy, and how does that change over time?”**
+- `profgpu` answers: **“Is the device busy, and how does that change over time?”**
 - Nsight tools answer: **“Why is this kernel slow?”** (kernel-level counters, stall reasons, timelines)
 
-They are complementary. `gpu-profile` is typically a first-pass instrumentation step.
+They are complementary. `profgpu` is typically a first-pass instrumentation step.
 
 ## Does it work for multi-GPU?
 
@@ -89,7 +89,7 @@ Yes. Set the `device` parameter (0-based index):
 GpuMonitor(device=1)
 ```
 
-In distributed training, each process usually has one GPU; run `gpu-profile` per process and log per-rank summaries.
+In distributed training, each process usually has one GPU; run `profgpu` per process and log per-rank summaries.
 
 ## Does it support AMD/Intel GPUs?
 

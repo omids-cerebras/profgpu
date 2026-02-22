@@ -6,7 +6,7 @@ Most teams eventually want utilization measurements to be:
 - emitted to structured logs
 - sent to a metrics system (Prometheus/StatsD)
 
-`gpu-profile` is designed to make this easy.
+`profgpu` is designed to make this easy.
 
 ## 1) Write JSONL with the decorator
 
@@ -14,10 +14,10 @@ Pass a callable to `report=`. It receives a `GpuSummary`.
 
 ```python
 import json
-from gpu_profile import gpu_profile
+from profgpu import gpu_profile
 
 def write_jsonl(summary):
-    with open("gpu_profile.jsonl", "a") as f:
+    with open("profgpu.jsonl", "a") as f:
         f.write(json.dumps(summary.__dict__) + "\n")
 
 @gpu_profile(report=write_jsonl)
@@ -31,7 +31,7 @@ work()
 
 ```python
 import logging
-from gpu_profile import gpu_profile
+from profgpu import gpu_profile
 
 log = logging.getLogger("gpu")
 
@@ -48,7 +48,7 @@ log.info("gpu_profile", extra={"gpu": res.gpu.__dict__})
 If you want to propagate the GPU summary through your codebase:
 
 ```python
-from gpu_profile import gpu_profile
+from profgpu import gpu_profile
 
 @gpu_profile(report=False, return_profile=True)
 def train():
@@ -67,7 +67,7 @@ metrics["gpu_util_mean"] = res.gpu.util_gpu_mean
 If you want a compact one-liner:
 
 ```python
-from gpu_profile import gpu_profile
+from profgpu import gpu_profile
 
 def one_liner(s):
     print(f"gpu={s.device} util_mean={s.util_gpu_mean:.1f}% p95={s.util_gpu_p95:.1f}% mem_max={s.mem_used_max_mb:.0f}MB")
@@ -81,13 +81,13 @@ work()
 
 ## 5) Keep and export raw samples
 
-If you need a time series (not just aggregates), set `keep_samples=True`.
+If you need a time series (not just aggregates), set `store_samples=True`.
 
 ```python
 import csv
-from gpu_profile import GpuMonitor
+from profgpu import GpuMonitor
 
-with GpuMonitor(interval_s=0.2, keep_samples=True) as mon:
+with GpuMonitor(interval_s=0.2, store_samples=True) as mon:
     ...
 
 with open("gpu_samples.csv", "w", newline="") as f:
@@ -106,7 +106,7 @@ Most trackers accept key/value metrics.
 - MLflow: `mlflow.log_metric("gpu_util_mean", summary.util_gpu_mean)`
 - Weights & Biases: `wandb.log({"gpu/util_mean": summary.util_gpu_mean})`
 
-Those libraries are intentionally not dependencies of `gpu-profile`; you can integrate in your own codebase.
+Those libraries are intentionally not dependencies of `profgpu`; you can integrate in your own codebase.
 
 ---
 

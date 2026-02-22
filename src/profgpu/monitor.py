@@ -1,25 +1,57 @@
+"""Core GPU monitoring engine.
+
+This module contains:
+
+* **Backends** – ``NvidiaNvmlBackend`` (low-overhead, recommended),
+  ``NvidiaSmiBackend`` (fallback), ``NullGpuBackend`` (no-op stub).
+* **Data model** – :class:`GpuSample`, :class:`GpuSummary`,
+  :class:`ProfiledResult`.
+* **Public API** – :class:`GpuMonitor` (context manager) and
+  :func:`gpu_profile` (decorator).
+
+Thread safety
+-------------
+Each :class:`GpuMonitor` runs a single daemon thread that calls
+``backend.read()`` at a fixed cadence.  The aggregator is updated only
+by that thread; the main thread reads the results **after** the thread
+has been joined in :meth:`GpuMonitor.stop`.
+"""
+
 from __future__ import annotations
 
+import abc
+import contextlib
 import functools
 import math
 import random
 import shutil
-import statistics
 import subprocess
 import threading
 import time
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 
-
-# ---------------------------
+# ---------------------------------------------------------------------------
 # Small utilities
-# ---------------------------
+# ---------------------------------------------------------------------------
+
 
 def _percentile(sorted_vals: Sequence[float], p: float) -> float:
-    """
-    Linear-interpolated percentile (like NumPy's default method for many cases).
-    Input must be sorted ascending.
+    """Return the *p*-th percentile using linear interpolation.
+
+    Parameters
+    ----------
+    sorted_vals:
+        Values **sorted in ascending order**.  An empty sequence returns
+        ``float('nan')``.
+    p:
+        Percentile in the range [0, 100].  Values outside that range are
+        clamped to the minimum / maximum of *sorted_vals*.
+
+    Returns
+    -------
+    float
+        The interpolated percentile value.
     """
     if not sorted_vals:
         return float("nan")
@@ -37,7 +69,24 @@ def _percentile(sorted_vals: Sequence[float], p: float) -> float:
 
 
 def _sparkline(values: Sequence[float], width: int = 40) -> str:
-    """Mini trace using unicode block characters."""
+    """Render a mini utilization trace using Unicode block characters.
+
+    The input values are down-sampled (nearest-neighbour) to *width*
+    characters.  Values are linearly mapped to one of eight vertical
+    block elements (``▁`` … ``█``).
+
+    Parameters
+    ----------
+    values:
+        Numeric sequence (typically GPU utilization %).  Empty input → "".
+    width:
+        Number of output characters.  Must be > 0.
+
+    Returns
+    -------
+    str
+        A fixed-width string suitable for terminal output.
+    """
     blocks = "▁▂▃▄▅▆▇█"
     if not values or width <= 0:
         return ""
@@ -59,42 +108,55 @@ def _sparkline(values: Sequence[float], width: int = 40) -> str:
     out = []
     for v in sampled:
         t = (v - vmin) / (vmax - vmin)  # [0,1]
-        j = int(round(t * (len(blocks) - 1)))
+        j = round(t * (len(blocks) - 1))
         j = max(0, min(len(blocks) - 1, j))
         out.append(blocks[j])
     return "".join(out)
 
 
-# ---------------------------
+# ---------------------------------------------------------------------------
 # Backends
-# ---------------------------
+# ---------------------------------------------------------------------------
+
+#: Keys that every backend **must** include in the dict returned by
+#: :meth:`BaseGpuBackend.read`.  Missing / unsupported metrics are ``None``.
+METRIC_KEYS: tuple[str, ...] = (
+    "util_gpu",  # GPU core utilization (%)
+    "util_mem",  # Memory-controller utilization (%)
+    "mem_used_mb",  # Allocated device memory (MiB)
+    "mem_total_mb",  # Total device memory (MiB)
+    "power_w",  # Board power draw (W)
+    "temp_c",  # GPU die temperature (°C)
+    "sm_clock_mhz",  # Current SM clock frequency (MHz)
+    "mem_clock_mhz",  # Current memory clock frequency (MHz)
+)
+
 
 class GpuBackendError(RuntimeError):
-    """Backend initialization or sampling failed."""
+    """Raised when a backend cannot be initialised or a sample fails."""
 
 
-class BaseGpuBackend:
+class BaseGpuBackend(abc.ABC):
+    """Abstract base for all GPU sampling backends.
+
+    Subclasses must implement :meth:`device_name` and :meth:`read`.
+    Override :meth:`close` if the backend holds resources that need cleanup.
+    """
+
+    @abc.abstractmethod
     def device_name(self) -> str:
-        raise NotImplementedError
+        """Return a human-readable name for the monitored GPU."""
 
+    @abc.abstractmethod
     def read(self) -> Dict[str, Optional[float]]:
-        """
-        Return a dict of metrics. Unsupported metrics should be None.
+        """Sample current GPU metrics.
 
-        Keys:
-          - util_gpu (%)
-          - util_mem (%)
-          - mem_used_mb
-          - mem_total_mb
-          - power_w
-          - temp_c
-          - sm_clock_mhz
-          - mem_clock_mhz
+        Returns a ``dict`` whose keys are :data:`METRIC_KEYS`.  Metrics
+        that are unavailable or unsupported should be ``None``.
         """
-        raise NotImplementedError
 
-    def close(self) -> None:
-        return
+    def close(self) -> None:  # noqa: B027 – intentionally empty
+        """Release any resources held by the backend (optional)."""
 
 
 # NVML refcount so multiple monitors don't fight over init/shutdown.
@@ -185,8 +247,8 @@ class NvidiaNvmlBackend(BaseGpuBackend):
 
         mem = self._safe(lambda: p.nvmlDeviceGetMemoryInfo(h))
         if mem is not None:
-            out["mem_used_mb"] = float(mem.used) / (1024 ** 2)
-            out["mem_total_mb"] = float(mem.total) / (1024 ** 2)
+            out["mem_used_mb"] = float(mem.used) / (1024**2)
+            out["mem_total_mb"] = float(mem.total) / (1024**2)
 
         power_mw = self._safe(lambda: p.nvmlDeviceGetPowerUsage(h))
         if power_mw is not None:
@@ -211,8 +273,11 @@ class NvidiaNvmlBackend(BaseGpuBackend):
 
 
 class NvidiaSmiBackend(BaseGpuBackend):
-    """
-    Fallback backend using `nvidia-smi` queries. Heavier than NVML because it spawns a process per sample.
+    """Fallback backend that shells out to ``nvidia-smi`` once per sample.
+
+    This works on any system where the ``nvidia-smi`` binary is on ``$PATH``
+    but is considerably heavier than :class:`NvidiaNvmlBackend` because it
+    spawns a subprocess for every sample.
     """
 
     def __init__(self, device: int = 0):
@@ -288,7 +353,12 @@ class NvidiaSmiBackend(BaseGpuBackend):
 
 
 class NullGpuBackend(BaseGpuBackend):
-    """A backend that always returns None metrics; used when no backend is available and strict=False."""
+    """No-op backend that returns ``None`` for every metric.
+
+    Used automatically when ``backend='none'`` is requested, or when
+    ``strict=False`` and no real backend could be initialised.  The
+    :attr:`reason` attribute records *why* no real backend was used.
+    """
 
     def __init__(self, reason: str):
         self.reason = reason
@@ -297,24 +367,43 @@ class NullGpuBackend(BaseGpuBackend):
         return "N/A"
 
     def read(self) -> Dict[str, Optional[float]]:
-        return {
-            "util_gpu": None,
-            "util_mem": None,
-            "mem_used_mb": None,
-            "mem_total_mb": None,
-            "power_w": None,
-            "temp_c": None,
-            "sm_clock_mhz": None,
-            "mem_clock_mhz": None,
-        }
+        return {k: None for k in METRIC_KEYS}
 
 
-# ---------------------------
+# ---------------------------------------------------------------------------
 # Data model
-# ---------------------------
+# ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class GpuSample:
+    """A single point-in-time GPU measurement.
+
+    All metric fields are ``Optional[float]`` because not every backend
+    can report every metric (or the GPU may not support it).
+
+    Attributes
+    ----------
+    t_s:
+        Elapsed wall-clock seconds since monitoring started.
+    util_gpu:
+        GPU core utilization (0–100 %).
+    util_mem:
+        Memory controller utilization (0–100 %).
+    mem_used_mb:
+        Allocated GPU memory (MiB).
+    mem_total_mb:
+        Total GPU memory (MiB).
+    power_w:
+        Board power draw (W).
+    temp_c:
+        GPU die temperature (°C).
+    sm_clock_mhz:
+        Current SM clock frequency (MHz).
+    mem_clock_mhz:
+        Current memory clock frequency (MHz).
+    """
+
     t_s: float
     util_gpu: Optional[float]
     util_mem: Optional[float]
@@ -328,6 +417,14 @@ class GpuSample:
 
 @dataclass(frozen=True)
 class GpuSummary:
+    """Aggregated statistics produced after a monitoring session.
+
+    This is the primary output of :meth:`GpuMonitor.stop` (or equivalently
+    ``mon.summary`` after the context manager exits).  It includes mean,
+    percentile, and max aggregates for GPU utilisation, memory, power,
+    and temperature.
+    """
+
     device: int
     name: str
     duration_s: float
@@ -353,6 +450,12 @@ class GpuSummary:
     notes: str = ""
 
     def format(self) -> str:
+        """Return a human-readable multi-line summary string.
+
+        Suitable for printing to the terminal.  Numeric values that are
+        ``NaN`` (i.e. the metric was never observed) render as ``n/a``.
+        """
+
         def f(x: float, unit: str = "", digits: int = 1) -> str:
             if x is None or (isinstance(x, float) and math.isnan(x)):
                 return "n/a"
@@ -360,18 +463,24 @@ class GpuSummary:
 
         lines: List[str] = []
         lines.append(f"[GPU {self.device}] {self.name}")
-        lines.append(f"  duration: {f(self.duration_s,'s',3)} | samples: {self.n_samples} @ {f(self.interval_s,'s',3)}")
+        lines.append(
+            f"  duration: {f(self.duration_s, 's', 3)} | samples: {self.n_samples} @ {f(self.interval_s, 's', 3)}"
+        )
         lines.append(
             "  util.gpu: "
-            f"mean {f(self.util_gpu_mean,'%',1)} | p50 {f(self.util_gpu_p50,'%',1)} | "
-            f"p95 {f(self.util_gpu_p95,'%',1)} | max {f(self.util_gpu_max,'%',1)}"
+            f"mean {f(self.util_gpu_mean, '%', 1)} | p50 {f(self.util_gpu_p50, '%', 1)} | "
+            f"p95 {f(self.util_gpu_p95, '%', 1)} | max {f(self.util_gpu_max, '%', 1)}"
         )
-        lines.append(f"  util.mem: mean {f(self.util_mem_mean,'%',1)}")
+        lines.append(f"  util.mem: mean {f(self.util_mem_mean, '%', 1)}")
         if not math.isnan(self.mem_total_mb):
-            lines.append(f"  memory: max used {f(self.mem_used_max_mb,' MB',0)} / total {f(self.mem_total_mb,' MB',0)}")
-        lines.append(f"  power: mean {f(self.power_mean_w,' W',1)} | max {f(self.power_max_w,' W',1)}")
-        lines.append(f"  temp: max {f(self.temp_max_c,' °C',0)}")
-        lines.append(f"  busy time (est): {f(self.busy_time_est_s,'s',3)}")
+            lines.append(
+                f"  memory: max used {f(self.mem_used_max_mb, ' MB', 0)} / total {f(self.mem_total_mb, ' MB', 0)}"
+            )
+        lines.append(
+            f"  power: mean {f(self.power_mean_w, ' W', 1)} | max {f(self.power_max_w, ' W', 1)}"
+        )
+        lines.append(f"  temp: max {f(self.temp_max_c, ' °C', 0)}")
+        lines.append(f"  busy time (est): {f(self.busy_time_est_s, 's', 3)}")
         if self.sparkline:
             lines.append(f"  util trace: {self.sparkline}")
         if self.notes:
@@ -381,16 +490,53 @@ class GpuSummary:
 
 @dataclass(frozen=True)
 class ProfiledResult:
+    """Wrapper returned by ``@gpu_profile(return_profile=True)``.
+
+    Attributes
+    ----------
+    value:
+        The original return value of the decorated function.
+    gpu:
+        The :class:`GpuSummary` captured while the function ran.
+    """
+
     value: Any
     gpu: GpuSummary
 
 
-# ---------------------------
+# ---------------------------------------------------------------------------
 # Streaming aggregation
-# ---------------------------
+# ---------------------------------------------------------------------------
+
 
 class _Aggregator:
-    def __init__(self, *, warmup_s: float, reservoir_size: int, trace_len: int):
+    """Online statistics accumulator for GPU samples.
+
+    Designed to run inside the sampling thread.  All operations are O(1)
+    amortised per sample:
+
+    * **Means** are kept as running sums + counts.
+    * **Maxima** are maintained incrementally.
+    * **Percentiles** are approximated via *reservoir sampling* so we
+      never need to store the full history.
+    * **Sparkline** trace is kept as a compressed ring-buffer
+      (pair-wise averaging when the buffer overflows).
+    """
+
+    def __init__(self, *, warmup_s: float, reservoir_size: int, trace_len: int) -> None:
+        """Initialise the aggregator.
+
+        Parameters
+        ----------
+        warmup_s:
+            Ignore samples whose ``t_s`` is less than this value.
+        reservoir_size:
+            Maximum number of ``util_gpu`` values to keep for percentile
+            estimation (Algorithm R reservoir sampling).
+        trace_len:
+            Maximum length of the compressed utilisation trace used for
+            the sparkline.
+        """
         self.warmup_s = float(max(0.0, warmup_s))
         self.reservoir_size = int(max(16, reservoir_size))
         self.trace_len = int(max(40, trace_len))
@@ -422,6 +568,7 @@ class _Aggregator:
         self._util_trace: List[float] = []
 
     def _trace_append(self, v: float) -> None:
+        """Append *v* to the sparkline trace, compressing when full."""
         self._util_trace.append(v)
         # Compress by averaging pairs until we fit.
         while len(self._util_trace) > self.trace_len:
@@ -436,6 +583,7 @@ class _Aggregator:
             self._util_trace = new
 
     def _reservoir_add(self, v: float) -> None:
+        """Insert *v* into the reservoir using Algorithm R sampling."""
         self._util_gpu_seen += 1
         if len(self._util_gpu_reservoir) < self.reservoir_size:
             self._util_gpu_reservoir.append(v)
@@ -445,6 +593,10 @@ class _Aggregator:
             self._util_gpu_reservoir[j] = v
 
     def add(self, t_s: float, metrics: Dict[str, Optional[float]]) -> None:
+        """Ingest a single sample at time *t_s* seconds.
+
+        Samples before :attr:`warmup_s` are silently discarded.
+        """
         if t_s < self.warmup_s:
             return
 
@@ -467,7 +619,9 @@ class _Aggregator:
         mem_used = metrics.get("mem_used_mb")
         if mem_used is not None:
             v = float(mem_used)
-            self.mem_used_max_mb = v if math.isnan(self.mem_used_max_mb) else max(self.mem_used_max_mb, v)
+            self.mem_used_max_mb = (
+                v if math.isnan(self.mem_used_max_mb) else max(self.mem_used_max_mb, v)
+            )
 
         mem_total = metrics.get("mem_total_mb")
         if mem_total is not None:
@@ -486,36 +640,77 @@ class _Aggregator:
             self.temp_max_c = v if math.isnan(self.temp_max_c) else max(self.temp_max_c, v)
 
     def util_gpu_mean(self) -> float:
+        """Return the arithmetic mean of GPU utilisation, or ``NaN``."""
         return (self._util_gpu_sum / self._util_gpu_n) if self._util_gpu_n else float("nan")
 
     def util_mem_mean(self) -> float:
+        """Return the arithmetic mean of memory-controller utilisation, or ``NaN``."""
         return (self._util_mem_sum / self._util_mem_n) if self._util_mem_n else float("nan")
 
     def power_mean_w(self) -> float:
+        """Return the arithmetic mean of power draw (watts), or ``NaN``."""
         return (self._power_sum / self._power_n) if self._power_n else float("nan")
 
     def util_gpu_quantiles(self) -> Dict[str, float]:
+        """Return approximate p50 and p95 of GPU utilisation from the reservoir."""
         if not self._util_gpu_reservoir:
             return {"p50": float("nan"), "p95": float("nan")}
         vals = sorted(self._util_gpu_reservoir)
         return {"p50": _percentile(vals, 50), "p95": _percentile(vals, 95)}
 
     def sparkline(self, width: int = 40) -> str:
+        """Return a sparkline string of the compressed utilisation trace."""
         if not self._util_trace:
             return ""
         return _sparkline(self._util_trace, width=width)
 
 
-# ---------------------------
+# ---------------------------------------------------------------------------
 # Public API: monitor + decorator
-# ---------------------------
+# ---------------------------------------------------------------------------
+
 
 class GpuMonitor:
-    """
-    Context manager that samples GPU metrics in a background thread.
+    """Context manager that samples GPU metrics in a background thread.
 
-    If your GPU framework launches work asynchronously (e.g. PyTorch), pass a `sync_fn`
-    (e.g. `torch.cuda.synchronize`) to make the monitor boundaries match actual GPU work.
+    Usage::
+
+        with GpuMonitor(device=0, interval_s=0.2) as mon:
+            run_training()
+        print(mon.summary.format())
+
+    If your GPU framework dispatches work asynchronously (e.g. PyTorch
+    CUDA streams), pass a *sync_fn* (e.g. ``torch.cuda.synchronize``)
+    so the monitored region matches actual GPU work.
+
+    Parameters
+    ----------
+    device:
+        GPU index (0-based).
+    interval_s:
+        Sampling interval in seconds.  Lower values give finer
+        resolution but slightly higher CPU overhead.
+    backend:
+        ``"auto"`` tries NVML then nvidia-smi.  ``"nvml"`` or ``"smi"``
+        force a specific backend.  ``"none"`` disables real sampling.
+    strict:
+        If ``True``, raise :class:`GpuBackendError` when no backend can
+        be initialised or when a sample fails.
+    sync_fn:
+        Called on ``__enter__`` and ``__exit__`` to synchronise
+        asynchronous GPU work (e.g. ``torch.cuda.synchronize``).
+    warmup_s:
+        Ignore samples taken before this many seconds have elapsed.
+    store_samples:
+        If ``True``, keep raw :class:`GpuSample` objects (accessible
+        via :attr:`samples`).  Automatically down-samples when
+        *max_samples* is exceeded.
+    max_samples:
+        Cap on stored samples before automatic 2× down-sampling.
+    reservoir_size:
+        Size of the reservoir used for approximate percentiles.
+    trace_len:
+        Length of the compressed utilisation trace (sparkline).
     """
 
     def __init__(
@@ -552,7 +747,9 @@ class GpuMonitor:
         self._t0: Optional[float] = None
         self._t1: Optional[float] = None
 
-        self._agg = _Aggregator(warmup_s=self.warmup_s, reservoir_size=reservoir_size, trace_len=trace_len)
+        self._agg = _Aggregator(
+            warmup_s=self.warmup_s, reservoir_size=reservoir_size, trace_len=trace_len
+        )
         self._samples: List[GpuSample] = []
 
         self._thread_error: Optional[BaseException] = None
@@ -561,6 +758,7 @@ class GpuMonitor:
         self.summary: Optional[GpuSummary] = None
 
     def _make_backend(self) -> BaseGpuBackend:
+        """Instantiate the requested (or auto-detected) sampling backend."""
         errors: List[str] = []
 
         if self.backend in ("auto", "nvml"):
@@ -590,13 +788,12 @@ class GpuMonitor:
             raise GpuBackendError(f"Could not initialize a GPU backend. Details: {reason}")
         return NullGpuBackend(reason)
 
-    def __enter__(self) -> "GpuMonitor":
+    def __enter__(self) -> GpuMonitor:
+        """Start the background sampling thread."""
         # Optional sync to exclude earlier queued work
         if self.sync_fn is not None:
-            try:
+            with contextlib.suppress(Exception):
                 self.sync_fn()
-            except Exception:
-                pass
 
         self._t0 = time.perf_counter()
         self._stop.clear()
@@ -604,18 +801,18 @@ class GpuMonitor:
         self._thread.start()
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> bool:
+    def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+        """Sync (if applicable), stop sampling, and compute the summary."""
         # Optional sync so the block includes queued async GPU work
         if self.sync_fn is not None:
-            try:
+            with contextlib.suppress(Exception):
                 self.sync_fn()
-            except Exception:
-                pass
 
         self.stop()
-        return False
+        return None
 
     def _run(self) -> None:
+        """Sampling loop executed inside the daemon thread."""
         assert self._t0 is not None
         t0 = self._t0
 
@@ -660,6 +857,16 @@ class GpuMonitor:
         return list(self._samples)
 
     def stop(self) -> GpuSummary:
+        """Stop sampling and return the computed :class:`GpuSummary`.
+
+        Safe to call multiple times; subsequent calls return the cached
+        summary.
+
+        Raises
+        ------
+        GpuBackendError
+            If ``strict=True`` and the sampling thread encountered an error.
+        """
         if self._t1 is None:
             self._t1 = time.perf_counter()
 
@@ -667,20 +874,21 @@ class GpuMonitor:
         if self._thread is not None:
             self._thread.join(timeout=max(1.0, 5 * self.interval_s))
 
-        try:
+        with contextlib.suppress(Exception):
             self._backend_obj.close()
-        except Exception:
-            pass
 
         self.summary = self._summarize()
 
         # Surface thread error after producing a best-effort summary.
         if self._thread_error is not None and self.strict:
-            raise GpuBackendError(f"GPU sampling failed: {self._thread_error_msg}") from self._thread_error
+            raise GpuBackendError(
+                f"GPU sampling failed: {self._thread_error_msg}"
+            ) from self._thread_error
 
         return self.summary
 
     def _summarize(self) -> GpuSummary:
+        """Build a :class:`GpuSummary` from the current aggregator state."""
         name = self._backend_obj.device_name()
         duration = max(0.0, (self._t1 or time.perf_counter()) - (self._t0 or 0.0))
 
@@ -698,7 +906,7 @@ class GpuMonitor:
 
         notes_parts: List[str] = []
         if isinstance(self._backend_obj, NullGpuBackend):
-            notes_parts.append(getattr(self._backend_obj, "reason", ""))
+            notes_parts.append(self._backend_obj.reason)
         if self.warmup_s > 0:
             notes_parts.append(f"warmup ignored: first {self.warmup_s:.2f}s")
         if self._thread_error is not None and not self.strict:
@@ -739,17 +947,25 @@ def gpu_profile(
     report: Union[bool, Callable[[GpuSummary], None]] = True,
     return_profile: bool = False,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """
-    Decorator to sample GPU utilization while a function runs.
+    """Decorator that profiles GPU utilisation while a function runs.
 
+    Usage::
+
+        @gpu_profile(interval_s=0.1)
+        def train_epoch():
+            ...
+
+    Parameters
+    ----------
+    device, interval_s, backend, strict, sync_fn, warmup_s, store_samples:
+        Forwarded to :class:`GpuMonitor`.
     report:
-      - True: print summary
-      - False: no printing
-      - callable: called with GpuSummary
-
+        ``True`` (default) prints the summary to *stdout*.  ``False``
+        suppresses output.  A callable is invoked with the
+        :class:`GpuSummary`.
     return_profile:
-      - False: return original function value
-      - True: return ProfiledResult(value, gpu_summary)
+        If ``True`` the decorated function returns a
+        :class:`ProfiledResult` instead of the raw return value.
     """
 
     def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:

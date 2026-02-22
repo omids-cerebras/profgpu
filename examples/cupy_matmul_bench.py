@@ -10,8 +10,7 @@ Notes:
 
 import time
 
-from gpu_profile import gpu_profile
-
+from profgpu import gpu_profile
 
 try:
     import cupy as cp
@@ -19,7 +18,7 @@ except Exception as e:
     raise SystemExit(
         "CuPy is not installed (or failed to import). Install cupy for your CUDA version, e.g. cupy-cuda12x.\n"
         f"Original error: {e}"
-    )
+    ) from e
 
 
 SYNC = cp.cuda.Stream.null.synchronize

@@ -1,4 +1,4 @@
-"""Example: write gpu-profile summaries to JSONL.
+"""Example: write profgpu summaries to JSONL.
 
 Run:
   python examples/log_jsonl.py
@@ -10,11 +10,11 @@ On a real GPU workload, you will see non-zero utilization.
 import json
 import time
 
-from gpu_profile import gpu_profile
+from profgpu import gpu_profile
 
 
 def write_jsonl(summary):
-    with open("gpu_profile.jsonl", "a") as f:
+    with open("profgpu.jsonl", "a") as f:
         f.write(json.dumps(summary.__dict__) + "\n")
 
 
@@ -25,4 +25,4 @@ def work():
 
 if __name__ == "__main__":
     work()
-    print("Wrote gpu_profile.jsonl")
+    print("Wrote profgpu.jsonl")

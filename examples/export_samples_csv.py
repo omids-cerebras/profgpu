@@ -3,17 +3,18 @@
 Run:
   python examples/export_samples_csv.py
 
-This uses keep_samples=True to retain time series samples.
+This uses ``store_samples=True`` to retain the time-series of
+:class:`~profgpu.GpuSample` objects for later export.
 """
 
 import csv
 import time
 
-from gpu_profile import GpuMonitor
+from profgpu import GpuMonitor
 
 
-def main():
-    with GpuMonitor(interval_s=0.2, keep_samples=True, strict=False) as mon:
+def main() -> None:
+    with GpuMonitor(interval_s=0.2, store_samples=True, strict=False) as mon:
         time.sleep(5)
 
     print(mon.summary.format())

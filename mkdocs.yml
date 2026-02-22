@@ -1,7 +1,7 @@
-site_name: gpu-profile
+site_name: profgpu
 site_description: Programmatic GPU utilization profiling (decorator + context manager + CLI)
-repo_url: https://github.com/<you>/gpu-profile
-repo_name: <you>/gpu-profile
+repo_url: https://github.com/<you>/profgpu
+repo_name: <you>/profgpu
 
 theme:
   name: material

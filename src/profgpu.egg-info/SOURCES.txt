@@ -1,0 +1,15 @@
+LICENSE
+README.md
+pyproject.toml
+src/profgpu/__init__.py
+src/profgpu/__main__.py
+src/profgpu/cli.py
+src/profgpu/monitor.py
+src/profgpu/py.typed
+src/profgpu.egg-info/PKG-INFO
+src/profgpu.egg-info/SOURCES.txt
+src/profgpu.egg-info/dependency_links.txt
+src/profgpu.egg-info/entry_points.txt
+src/profgpu.egg-info/requires.txt
+src/profgpu.egg-info/top_level.txt
+tests/test_basic.py
