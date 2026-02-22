@@ -29,7 +29,7 @@ import subprocess
 import threading
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Sequence, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 # ---------------------------------------------------------------------------
 # Small utilities
@@ -422,32 +422,57 @@ class GpuSummary:
     This is the primary output of :meth:`GpuMonitor.stop` (or equivalently
     ``mon.summary`` after the context manager exits).  It includes mean,
     percentile, and max aggregates for GPU utilisation, memory, power,
-    and temperature.
+    temperature, and clocks.
+
+    All fields are required.  Metrics that were never observed are
+    ``float('nan')``.
     """
 
+    # --- Metadata ---
     device: int
     name: str
     duration_s: float
     interval_s: float
     n_samples: int
 
+    # --- GPU core utilization ---
     util_gpu_mean: float
+    util_gpu_std: float
+    util_gpu_min: float
+    util_gpu_max: float
+    util_gpu_p5: float
     util_gpu_p50: float
     util_gpu_p95: float
-    util_gpu_max: float
+    util_gpu_p99: float
+    idle_pct: float  # % of samples where util_gpu < 5 %
+    active_pct: float  # % of samples where util_gpu >= 50 %
 
+    # --- Memory-controller utilization ---
     util_mem_mean: float
 
+    # --- Device memory ---
+    mem_used_mean_mb: float
     mem_used_max_mb: float
     mem_total_mb: float
+    mem_util_pct: float  # peak mem_used_max as % of mem_total
 
+    # --- Power ---
     power_mean_w: float
     power_max_w: float
+    energy_j: float
+
+    # --- Temperature ---
+    temp_mean_c: float
     temp_max_c: float
 
+    # --- Clocks ---
+    sm_clock_mean_mhz: float
+    sm_clock_max_mhz: float
+
+    # --- Derived ---
     busy_time_est_s: float
     sparkline: str
-    notes: str = ""
+    notes: str
 
     def format(self) -> str:
         """Return a human-readable multi-line summary string.
@@ -464,22 +489,62 @@ class GpuSummary:
         lines: List[str] = []
         lines.append(f"[GPU {self.device}] {self.name}")
         lines.append(
-            f"  duration: {f(self.duration_s, 's', 3)} | samples: {self.n_samples} @ {f(self.interval_s, 's', 3)}"
+            f"  duration: {f(self.duration_s, 's', 3)} | samples: {self.n_samples}"
+            f" @ {f(self.interval_s, 's', 3)}"
         )
+
+        # GPU utilization — core stats
         lines.append(
             "  util.gpu: "
-            f"mean {f(self.util_gpu_mean, '%', 1)} | p50 {f(self.util_gpu_p50, '%', 1)} | "
-            f"p95 {f(self.util_gpu_p95, '%', 1)} | max {f(self.util_gpu_max, '%', 1)}"
+            f"mean {f(self.util_gpu_mean, '%', 1)} | std {f(self.util_gpu_std, '%', 1)}"
+            f" | min {f(self.util_gpu_min, '%', 1)} | max {f(self.util_gpu_max, '%', 1)}"
         )
-        lines.append(f"  util.mem: mean {f(self.util_mem_mean, '%', 1)}")
-        if not math.isnan(self.mem_total_mb):
-            lines.append(
-                f"  memory: max used {f(self.mem_used_max_mb, ' MB', 0)} / total {f(self.mem_total_mb, ' MB', 0)}"
-            )
         lines.append(
+            f"            p5 {f(self.util_gpu_p5, '%', 1)} | p50 {f(self.util_gpu_p50, '%', 1)}"
+            f" | p95 {f(self.util_gpu_p95, '%', 1)} | p99 {f(self.util_gpu_p99, '%', 1)}"
+        )
+        lines.append(
+            f"            idle (<5%) {f(self.idle_pct, '%', 1)}"
+            f" | active (≥50%) {f(self.active_pct, '%', 1)}"
+        )
+
+        # Memory-controller utilization
+        lines.append(f"  util.mem: mean {f(self.util_mem_mean, '%', 1)}")
+
+        # Device memory (skip entire line if all memory metrics are NaN)
+        has_mem = (
+            not math.isnan(self.mem_used_mean_mb)
+            or not math.isnan(self.mem_used_max_mb)
+            or not math.isnan(self.mem_total_mb)
+        )
+        if has_mem:
+            mem_parts = f"  memory: mean {f(self.mem_used_mean_mb, ' MB', 0)} | max {f(self.mem_used_max_mb, ' MB', 0)}"
+            if not math.isnan(self.mem_total_mb):
+                mem_parts += f" / total {f(self.mem_total_mb, ' MB', 0)}"
+                if not math.isnan(self.mem_util_pct):
+                    mem_parts += f" ({f(self.mem_util_pct, '%', 1)} peak)"
+            lines.append(mem_parts)
+
+        # Power & energy
+        power_line = (
             f"  power: mean {f(self.power_mean_w, ' W', 1)} | max {f(self.power_max_w, ' W', 1)}"
         )
-        lines.append(f"  temp: max {f(self.temp_max_c, ' °C', 0)}")
+        if not math.isnan(self.energy_j):
+            power_line += f" | energy {f(self.energy_j, ' J', 1)}"
+        lines.append(power_line)
+
+        # Clocks
+        if not math.isnan(self.sm_clock_mean_mhz):
+            clock_line = f"  clocks: SM mean {f(self.sm_clock_mean_mhz, ' MHz', 0)}"
+            if not math.isnan(self.sm_clock_max_mhz):
+                clock_line += f" (max {f(self.sm_clock_max_mhz, ' MHz', 0)})"
+            lines.append(clock_line)
+
+        # Temperature
+        temp_line = f"  temp: mean {f(self.temp_mean_c, ' °C', 0)}"
+        temp_line += f" | max {f(self.temp_max_c, ' °C', 0)}"
+        lines.append(temp_line)
+
         lines.append(f"  busy time (est): {f(self.busy_time_est_s, 's', 3)}")
         if self.sparkline:
             lines.append(f"  util trace: {self.sparkline}")
@@ -490,7 +555,7 @@ class GpuSummary:
 
 @dataclass(frozen=True)
 class ProfiledResult:
-    """Wrapper returned by ``@gpu_profile(return_profile=True)``.
+    """Wrapper returned by ``@gpu_profile(return_profile=True)`` for a single run.
 
     Attributes
     ----------
@@ -502,6 +567,140 @@ class ProfiledResult:
 
     value: Any
     gpu: GpuSummary
+
+
+@dataclass(frozen=True)
+class RunStats:
+    """Descriptive statistics computed across multiple profiling runs.
+
+    Use this to assess whether a GPU metric is stable across runs or
+    varies significantly (high ``std``).
+    """
+
+    mean: float
+    std: float
+    min: float
+    max: float
+    values: Tuple[float, ...]
+
+    def format(self, unit: str = "", digits: int = 1) -> str:
+        """One-line summary like ``87.3% ± 1.2%  (range 85.6–89.1%)``."""
+
+        def _f(x: float) -> str:
+            if math.isnan(x):
+                return "n/a"
+            return f"{x:.{digits}f}{unit}"
+
+        parts = f"{_f(self.mean)} ± {_f(self.std)}"
+        parts += f"  (range {_f(self.min)}-{_f(self.max)})"
+        return parts
+
+
+def _compute_run_stats(values: Sequence[float]) -> RunStats:
+    """Build a :class:`RunStats` from a sequence of per-run measurements."""
+    clean = [v for v in values if not math.isnan(v)]
+    tup = tuple(values)
+    if not clean:
+        return RunStats(
+            mean=float("nan"),
+            std=float("nan"),
+            min=float("nan"),
+            max=float("nan"),
+            values=tup,
+        )
+    n = len(clean)
+    mean_val = sum(clean) / n
+    if n >= 2:
+        variance = sum((x - mean_val) ** 2 for x in clean) / (n - 1)
+        std_val = math.sqrt(variance)
+    else:
+        std_val = float("nan")
+    return RunStats(
+        mean=mean_val,
+        std=std_val,
+        min=min(clean),
+        max=max(clean),
+        values=tup,
+    )
+
+
+@dataclass(frozen=True)
+class MultiRunResult:
+    """Aggregated result from running a profiled workload multiple times.
+
+    Attributes
+    ----------
+    value:
+        Return value of the **last** run.
+    runs:
+        Individual :class:`GpuSummary` for each counted run (warmup
+        runs excluded).
+    duration:
+        Cross-run :class:`RunStats` of ``duration_s``.
+    util_gpu:
+        Cross-run :class:`RunStats` of ``util_gpu_mean``.
+    power:
+        Cross-run :class:`RunStats` of ``power_mean_w``.
+    energy:
+        Cross-run :class:`RunStats` of ``energy_j``.
+    peak_memory:
+        Cross-run :class:`RunStats` of ``mem_used_max_mb``.
+    peak_temp:
+        Cross-run :class:`RunStats` of ``temp_max_c``.
+    """
+
+    value: Any
+    runs: Tuple[GpuSummary, ...]
+
+    # Pre-computed cross-run statistics for the most-used metrics
+    duration: RunStats
+    util_gpu: RunStats
+    power: RunStats
+    energy: RunStats
+    peak_memory: RunStats
+    peak_temp: RunStats
+
+    @staticmethod
+    def from_runs(runs: Sequence[GpuSummary], value: Any) -> MultiRunResult:
+        """Construct from a list of per-run summaries."""
+        tup = tuple(runs)
+        return MultiRunResult(
+            value=value,
+            runs=tup,
+            duration=_compute_run_stats([r.duration_s for r in tup]),
+            util_gpu=_compute_run_stats([r.util_gpu_mean for r in tup]),
+            power=_compute_run_stats([r.power_mean_w for r in tup]),
+            energy=_compute_run_stats([r.energy_j for r in tup]),
+            peak_memory=_compute_run_stats([r.mem_used_max_mb for r in tup]),
+            peak_temp=_compute_run_stats([r.temp_max_c for r in tup]),
+        )
+
+    def stats_for(self, field: str) -> RunStats:
+        """Compute :class:`RunStats` for any numeric :class:`GpuSummary` field."""
+        vals = [getattr(r, field) for r in self.runs]
+        return _compute_run_stats(vals)
+
+    def format(self) -> str:
+        """Return a human-readable multi-run summary string."""
+        if not self.runs:
+            return "(no runs)"
+        first = self.runs[0]
+        lines: List[str] = []
+        lines.append(f"=== Multi-Run GPU Profile ({len(self.runs)} runs) ===")
+        lines.append(f"[GPU {first.device}] {first.name}")
+        lines.append(f"  duration:  {self.duration.format('s', 3)}")
+        lines.append(f"  util.gpu:  {self.util_gpu.format('%', 1)}")
+        lines.append(f"  power:     {self.power.format(' W', 1)}")
+        lines.append(f"  energy:    {self.energy.format(' J', 1)}")
+        lines.append(f"  peak mem:  {self.peak_memory.format(' MB', 0)}")
+        lines.append(f"  peak temp: {self.peak_temp.format(' °C', 0)}")
+        lines.append("")
+        lines.append("--- Per-Run util.gpu mean ---")
+        for i, r in enumerate(self.runs, 1):
+            u = r.util_gpu_mean
+            u_str = f"{u:.1f}%" if not math.isnan(u) else "n/a"
+            lines.append(f"  run {i}: {u_str}  ({r.duration_s:.3f}s)")
+        return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -543,18 +742,37 @@ class _Aggregator:
 
         self.n_samples = 0
 
-        # Means (separate counts because values can be missing)
+        # --- GPU utilization ---
         self._util_gpu_sum = 0.0
+        self._util_gpu_sq_sum = 0.0  # for std deviation
         self._util_gpu_n = 0
+        self._idle_count = 0  # samples where util_gpu < 5%
+        self._active_count = 0  # samples where util_gpu >= 50%
 
+        # --- Memory-controller utilization ---
         self._util_mem_sum = 0.0
         self._util_mem_n = 0
 
+        # --- Power ---
         self._power_sum = 0.0
         self._power_n = 0
 
-        # Maxes
+        # --- SM clocks ---
+        self._sm_clock_sum = 0.0
+        self._sm_clock_n = 0
+        self.sm_clock_max_mhz = float("nan")
+
+        # --- Memory usage ---
+        self._mem_used_sum = 0.0
+        self._mem_used_n = 0
+
+        # --- Temperature ---
+        self._temp_sum = 0.0
+        self._temp_n = 0
+
+        # --- Max trackers ---
         self.util_gpu_max = float("nan")
+        self.util_gpu_min = float("nan")
         self.mem_used_max_mb = float("nan")
         self.mem_total_mb = float("nan")
         self.power_max_w = float("nan")
@@ -606,8 +824,14 @@ class _Aggregator:
         if util_gpu is not None:
             v = float(util_gpu)
             self._util_gpu_sum += v
+            self._util_gpu_sq_sum += v * v
             self._util_gpu_n += 1
             self.util_gpu_max = v if math.isnan(self.util_gpu_max) else max(self.util_gpu_max, v)
+            self.util_gpu_min = v if math.isnan(self.util_gpu_min) else min(self.util_gpu_min, v)
+            if v < 5.0:
+                self._idle_count += 1
+            if v >= 50.0:
+                self._active_count += 1
             self._reservoir_add(v)
             self._trace_append(v)
 
@@ -619,6 +843,8 @@ class _Aggregator:
         mem_used = metrics.get("mem_used_mb")
         if mem_used is not None:
             v = float(mem_used)
+            self._mem_used_sum += v
+            self._mem_used_n += 1
             self.mem_used_max_mb = (
                 v if math.isnan(self.mem_used_max_mb) else max(self.mem_used_max_mb, v)
             )
@@ -637,26 +863,79 @@ class _Aggregator:
         temp = metrics.get("temp_c")
         if temp is not None:
             v = float(temp)
+            self._temp_sum += v
+            self._temp_n += 1
             self.temp_max_c = v if math.isnan(self.temp_max_c) else max(self.temp_max_c, v)
+
+        sm_clock = metrics.get("sm_clock_mhz")
+        if sm_clock is not None:
+            v = float(sm_clock)
+            self._sm_clock_sum += v
+            self._sm_clock_n += 1
+            self.sm_clock_max_mhz = (
+                v if math.isnan(self.sm_clock_max_mhz) else max(self.sm_clock_max_mhz, v)
+            )
 
     def util_gpu_mean(self) -> float:
         """Return the arithmetic mean of GPU utilisation, or ``NaN``."""
         return (self._util_gpu_sum / self._util_gpu_n) if self._util_gpu_n else float("nan")
 
+    def util_gpu_std(self) -> float:
+        """Return the population standard deviation of GPU utilisation, or ``NaN``."""
+        if self._util_gpu_n < 2:
+            return float("nan")
+        mean = self._util_gpu_sum / self._util_gpu_n
+        variance = (self._util_gpu_sq_sum / self._util_gpu_n) - (mean * mean)
+        return math.sqrt(max(0.0, variance))
+
+    def idle_pct(self) -> float:
+        """Return % of samples where GPU utilisation was < 5%."""
+        if self._util_gpu_n == 0:
+            return float("nan")
+        return 100.0 * self._idle_count / self._util_gpu_n
+
+    def active_pct(self) -> float:
+        """Return % of samples where GPU utilisation was >= 50%."""
+        if self._util_gpu_n == 0:
+            return float("nan")
+        return 100.0 * self._active_count / self._util_gpu_n
+
     def util_mem_mean(self) -> float:
         """Return the arithmetic mean of memory-controller utilisation, or ``NaN``."""
         return (self._util_mem_sum / self._util_mem_n) if self._util_mem_n else float("nan")
+
+    def mem_used_mean_mb(self) -> float:
+        """Return the arithmetic mean of memory used (MB), or ``NaN``."""
+        return (self._mem_used_sum / self._mem_used_n) if self._mem_used_n else float("nan")
 
     def power_mean_w(self) -> float:
         """Return the arithmetic mean of power draw (watts), or ``NaN``."""
         return (self._power_sum / self._power_n) if self._power_n else float("nan")
 
+    def sm_clock_mean_mhz(self) -> float:
+        """Return the arithmetic mean SM clock frequency (MHz), or ``NaN``."""
+        return (self._sm_clock_sum / self._sm_clock_n) if self._sm_clock_n else float("nan")
+
+    def temp_mean_c(self) -> float:
+        """Return the arithmetic mean GPU temperature (°C), or ``NaN``."""
+        return (self._temp_sum / self._temp_n) if self._temp_n else float("nan")
+
     def util_gpu_quantiles(self) -> Dict[str, float]:
-        """Return approximate p50 and p95 of GPU utilisation from the reservoir."""
+        """Return approximate p5, p50, p95, p99 of GPU utilisation from the reservoir."""
         if not self._util_gpu_reservoir:
-            return {"p50": float("nan"), "p95": float("nan")}
+            return {
+                "p5": float("nan"),
+                "p50": float("nan"),
+                "p95": float("nan"),
+                "p99": float("nan"),
+            }
         vals = sorted(self._util_gpu_reservoir)
-        return {"p50": _percentile(vals, 50), "p95": _percentile(vals, 95)}
+        return {
+            "p5": _percentile(vals, 5),
+            "p50": _percentile(vals, 50),
+            "p95": _percentile(vals, 95),
+            "p99": _percentile(vals, 99),
+        }
 
     def sparkline(self, width: int = 40) -> str:
         """Return a sparkline string of the compressed utilisation trace."""
@@ -897,12 +1176,29 @@ class GpuMonitor:
 
         util_mean = self._agg.util_gpu_mean()
         util_q = self._agg.util_gpu_quantiles()
+        util_p5 = util_q["p5"]
         util_p50 = util_q["p50"]
         util_p95 = util_q["p95"]
+        util_p99 = util_q["p99"]
 
         busy_est = float("nan")
         if not math.isnan(util_mean):
             busy_est = effective_duration * (util_mean / 100.0)
+
+        # Memory utilization as % of total
+        mem_util = float("nan")
+        if (
+            not math.isnan(self._agg.mem_used_max_mb)
+            and not math.isnan(self._agg.mem_total_mb)
+            and self._agg.mem_total_mb > 0
+        ):
+            mem_util = 100.0 * self._agg.mem_used_max_mb / self._agg.mem_total_mb
+
+        # Estimated energy consumption (joules)
+        power_mean = self._agg.power_mean_w()
+        energy = float("nan")
+        if not math.isnan(power_mean):
+            energy = power_mean * effective_duration
 
         notes_parts: List[str] = []
         if isinstance(self._backend_obj, NullGpuBackend):
@@ -919,16 +1215,35 @@ class GpuMonitor:
             duration_s=duration,
             interval_s=self.interval_s,
             n_samples=self._agg.n_samples,
+            # GPU utilization
             util_gpu_mean=util_mean,
+            util_gpu_std=self._agg.util_gpu_std(),
+            util_gpu_min=self._agg.util_gpu_min,
+            util_gpu_max=self._agg.util_gpu_max,
+            util_gpu_p5=util_p5,
             util_gpu_p50=util_p50,
             util_gpu_p95=util_p95,
-            util_gpu_max=self._agg.util_gpu_max,
+            util_gpu_p99=util_p99,
+            idle_pct=self._agg.idle_pct(),
+            active_pct=self._agg.active_pct(),
+            # Memory-controller utilization
             util_mem_mean=self._agg.util_mem_mean(),
+            # Device memory
+            mem_used_mean_mb=self._agg.mem_used_mean_mb(),
             mem_used_max_mb=self._agg.mem_used_max_mb,
             mem_total_mb=self._agg.mem_total_mb,
-            power_mean_w=self._agg.power_mean_w(),
+            mem_util_pct=mem_util,
+            # Power
+            power_mean_w=power_mean,
             power_max_w=self._agg.power_max_w,
+            energy_j=energy,
+            # Temperature
+            temp_mean_c=self._agg.temp_mean_c(),
             temp_max_c=self._agg.temp_max_c,
+            # Clocks
+            sm_clock_mean_mhz=self._agg.sm_clock_mean_mhz(),
+            sm_clock_max_mhz=self._agg.sm_clock_max_mhz,
+            # Derived
             busy_time_est_s=busy_est,
             sparkline=self._agg.sparkline(width=40),
             notes=notes,
@@ -944,8 +1259,10 @@ def gpu_profile(
     sync_fn: Optional[Callable[[], None]] = None,
     warmup_s: float = 0.0,
     store_samples: bool = False,
-    report: Union[bool, Callable[[GpuSummary], None]] = True,
+    report: Union[bool, Callable] = True,
     return_profile: bool = False,
+    repeats: int = 1,
+    warmup_runs: int = 0,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Decorator that profiles GPU utilisation while a function runs.
 
@@ -955,6 +1272,13 @@ def gpu_profile(
         def train_epoch():
             ...
 
+    For multi-run benchmarking::
+
+        @gpu_profile(repeats=5, warmup_runs=1, return_profile=True)
+        def bench():
+            ...
+        result = bench()   # returns MultiRunResult
+
     Parameters
     ----------
     device, interval_s, backend, strict, sync_fn, warmup_s, store_samples:
@@ -962,38 +1286,163 @@ def gpu_profile(
     report:
         ``True`` (default) prints the summary to *stdout*.  ``False``
         suppresses output.  A callable is invoked with the
-        :class:`GpuSummary`.
+        :class:`GpuSummary` (single run) or :class:`MultiRunResult`
+        (multi-run).
     return_profile:
         If ``True`` the decorated function returns a
-        :class:`ProfiledResult` instead of the raw return value.
+        :class:`ProfiledResult` (single run) or :class:`MultiRunResult`
+        (multi-run) instead of the raw return value.
+    repeats:
+        Number of times to run the function.  When > 1, results are
+        aggregated into a :class:`MultiRunResult` with cross-run
+        statistics (mean, std, min, max).
+    warmup_runs:
+        Number of initial runs to discard from the cross-run statistics
+        (they are still executed).  Only meaningful when ``repeats > 1``.
     """
+    if repeats < 1:
+        raise ValueError("repeats must be >= 1")
+    if warmup_runs < 0:
+        raise ValueError("warmup_runs must be >= 0")
+
+    def _make_monitor() -> GpuMonitor:
+        return GpuMonitor(
+            device=device,
+            interval_s=interval_s,
+            backend=backend,
+            strict=strict,
+            sync_fn=sync_fn,
+            warmup_s=warmup_s,
+            store_samples=store_samples,
+        )
 
     def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
-            with GpuMonitor(
-                device=device,
-                interval_s=interval_s,
-                backend=backend,
-                strict=strict,
-                sync_fn=sync_fn,
-                warmup_s=warmup_s,
-                store_samples=store_samples,
-            ) as mon:
-                value = fn(*args, **kwargs)
+            if repeats == 1:
+                return _single_run(fn, args, kwargs)
+            return _multi_run(fn, args, kwargs)
 
+        def _single_run(fn, args, kwargs):
+            with _make_monitor() as mon:
+                value = fn(*args, **kwargs)
             summary = mon.summary
             assert summary is not None
-
             if report is True:
                 print(summary.format())
             elif callable(report):
                 report(summary)
-
             if return_profile:
                 return ProfiledResult(value=value, gpu=summary)
+            return value
+
+        def _multi_run(fn, args, kwargs):
+            all_summaries: List[GpuSummary] = []
+            value: Any = None
+            for i in range(warmup_runs + repeats):
+                with _make_monitor() as mon:
+                    value = fn(*args, **kwargs)
+                summary = mon.summary
+                assert summary is not None
+                if i >= warmup_runs:
+                    all_summaries.append(summary)
+
+            result = MultiRunResult.from_runs(all_summaries, value)
+            if report is True:
+                print(result.format())
+            elif callable(report):
+                report(result)
+            if return_profile:
+                return result
             return value
 
         return wrapper
 
     return decorator
+
+
+def profile_repeats(
+    fn: Callable[..., Any],
+    *,
+    repeats: int = 5,
+    warmup_runs: int = 0,
+    device: int = 0,
+    interval_s: float = 0.2,
+    backend: str = "auto",
+    strict: bool = False,
+    sync_fn: Optional[Callable[[], None]] = None,
+    warmup_s: float = 0.0,
+    store_samples: bool = False,
+    report: Union[bool, Callable[[MultiRunResult], None]] = True,
+) -> MultiRunResult:
+    """Profile a callable over multiple runs and return cross-run statistics.
+
+    The callable *fn* is invoked ``warmup_runs + repeats`` times.  The
+    first *warmup_runs* executions are discarded; the remaining *repeats*
+    are profiled and aggregated into a :class:`MultiRunResult`.
+
+    Parameters
+    ----------
+    fn:
+        No-argument callable to profile.  Use ``functools.partial`` or a
+        ``lambda`` to bind arguments.
+    repeats:
+        Number of measured runs (must be >= 1).
+    warmup_runs:
+        Number of discarded warm-up runs.
+    device, interval_s, backend, strict, sync_fn, warmup_s, store_samples:
+        Forwarded to :class:`GpuMonitor` for each run.
+    report:
+        ``True`` prints the multi-run summary.  A callable receives the
+        :class:`MultiRunResult`.
+
+    Returns
+    -------
+    MultiRunResult
+        Cross-run statistics and the individual :class:`GpuSummary`
+        objects for every measured run.
+
+    Example
+    -------
+    ::
+
+        from profgpu import profile_repeats
+
+        result = profile_repeats(
+            lambda: train_epoch(model, loader),
+            repeats=5,
+            warmup_runs=1,
+            interval_s=0.1,
+        )
+        print(result.util_gpu.mean, "±", result.util_gpu.std)
+    """
+    if repeats < 1:
+        raise ValueError("repeats must be >= 1")
+    if warmup_runs < 0:
+        raise ValueError("warmup_runs must be >= 0")
+
+    summaries: List[GpuSummary] = []
+    value: Any = None
+
+    for i in range(warmup_runs + repeats):
+        with GpuMonitor(
+            device=device,
+            interval_s=interval_s,
+            backend=backend,
+            strict=strict,
+            sync_fn=sync_fn,
+            warmup_s=warmup_s,
+            store_samples=store_samples,
+        ) as mon:
+            value = fn()
+        summary = mon.summary
+        assert summary is not None
+        if i >= warmup_runs:
+            summaries.append(summary)
+
+    result = MultiRunResult.from_runs(summaries, value)
+    if report is True:
+        print(result.format())
+    elif callable(report):
+        report(result)
+    return result

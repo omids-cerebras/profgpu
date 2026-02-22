@@ -6,6 +6,7 @@ This page shows the most common usage patterns:
 - Context manager: profile a block.
 - CLI: profile an external command.
 - Structured reporting: capture results in code.
+- Multi-run benchmarking: estimate variance across repeated runs.
 
 ## 1) Decorator
 
@@ -26,7 +27,7 @@ At the end of the call, a one-page summary is printed to stdout.
 
 Many GPU frameworks schedule work asynchronously; the Python function can return *before* the GPU has finished.
 
-If you want “the function call” to include queued GPU work, pass a synchronization function:
+If you want "the function call" to include queued GPU work, pass a synchronization function:
 
 ```python
 import torch
@@ -72,9 +73,11 @@ print(res.value)
 print(res.gpu.util_gpu_mean, res.gpu.util_gpu_p95)
 ```
 
+The result is a `ProfiledResult(value=..., gpu=GpuSummary(...))`.
+
 ## 4) Use a custom report function (logging)
 
-The `report` parameter can also be a callable. It receives a `GpuSummary`.
+The `report` parameter can also be a callable. It receives a `GpuSummary` (single run) or `MultiRunResult` (multi-run).
 
 ```python
 import json
@@ -105,16 +108,74 @@ Emit JSON:
 profgpu --json -- python train.py
 ```
 
+Multi-run from CLI:
+
+```bash
+profgpu --repeats 5 --warmup-runs 1 -- python train.py
+```
+
 See [CLI Tutorial](tutorials/cli.md) for patterns like profiling shell pipelines and handling exit codes.
 
-## 6) What the numbers mean
+## 6) Multi-run benchmarking
+
+A single run can be noisy. Use `repeats` to run your function multiple times and get cross-run statistics (mean, std, min, max):
+
+### With the decorator
+
+```python
+from profgpu import gpu_profile
+
+@gpu_profile(repeats=5, warmup_runs=1, return_profile=True, report=False)
+def train_epoch():
+    ...
+
+result = train_epoch()  # MultiRunResult
+print(f"util.gpu: {result.util_gpu.mean:.1f}% +- {result.util_gpu.std:.1f}%")
+print(f"duration: {result.duration.mean:.3f}s +- {result.duration.std:.3f}s")
+print(f"energy:   {result.energy.mean:.1f} J")
+```
+
+### With `profile_repeats` (non-decorator)
+
+```python
+from profgpu import profile_repeats
+
+result = profile_repeats(
+    lambda: my_function(arg1, arg2),
+    repeats=5,
+    warmup_runs=1,
+    interval_s=0.1,
+)
+print(result.format())  # human-friendly summary
+```
+
+### Accessing any field across runs
+
+```python
+# Pre-computed stats for the most common metrics:
+result.duration      # RunStats for duration_s
+result.util_gpu      # RunStats for util_gpu_mean
+result.power         # RunStats for power_mean_w
+result.energy        # RunStats for energy_j
+result.peak_memory   # RunStats for mem_used_max_mb
+result.peak_temp     # RunStats for temp_max_c
+
+# On-demand stats for any GpuSummary field:
+idle = result.stats_for("idle_pct")
+print(f"idle: {idle.mean:.1f}% +- {idle.std:.1f}%")
+```
+
+## 7) What the numbers mean
 
 The key metric is **device-level** `util.gpu`:
 
-- `util.gpu` ≈ % of time the GPU was busy over a recent sampling window
-- `util.mem` ≈ memory-controller utilization
+- `util_gpu_mean` --- % of time the GPU was busy (averaged across samples)
+- `util_gpu_std` --- standard deviation of per-sample utilization
+- `idle_pct` --- fraction of samples where GPU util < 5%
+- `active_pct` --- fraction of samples where GPU util >= 50%
+- `util_mem_mean` --- memory-controller utilization
 
-The summary includes mean/p50/p95/max and an estimate of “busy time”:
+The summary includes mean/std/min/max/p5/p50/p95/p99 percentiles, plus:
 
 ```
 busy_time_est_s = duration_s * (util_gpu_mean / 100)

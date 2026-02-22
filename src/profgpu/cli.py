@@ -17,7 +17,7 @@ import subprocess
 import sys
 from typing import Callable, Optional
 
-from .monitor import GpuMonitor
+from .monitor import GpuMonitor, MultiRunResult
 
 
 def _maybe_torch_sync(enabled: bool) -> Optional[Callable[[], None]]:
@@ -86,6 +86,18 @@ def main(argv: Optional[list[str]] = None) -> int:
     )
     parser.add_argument("--json", action="store_true", help="Output summary as JSON on stdout")
     parser.add_argument(
+        "--repeats",
+        type=int,
+        default=1,
+        help="Run the command N times and report cross-run statistics",
+    )
+    parser.add_argument(
+        "--warmup-runs",
+        type=int,
+        default=0,
+        help="Discard the first N runs from statistics (still executed)",
+    )
+    parser.add_argument(
         "cmd",
         nargs=argparse.REMAINDER,
         help=("Command to run (use `--` before the command). Example: profgpu -- python train.py"),
@@ -107,27 +119,51 @@ def main(argv: Optional[list[str]] = None) -> int:
         return 2
 
     sync_fn = _maybe_torch_sync(args.torch_sync)
+    total_runs = args.warmup_runs + args.repeats
 
-    # Run the child command under GPU monitoring.
-    with GpuMonitor(
-        device=args.device,
-        interval_s=args.interval,
-        backend=args.backend,
-        strict=args.strict,
-        sync_fn=sync_fn,
-        warmup_s=args.warmup,
-    ) as mon:
-        proc = subprocess.run(cmd)
+    summaries = []
+    last_returncode = 0
+    for i in range(total_runs):
+        with GpuMonitor(
+            device=args.device,
+            interval_s=args.interval,
+            backend=args.backend,
+            strict=args.strict,
+            sync_fn=sync_fn,
+            warmup_s=args.warmup,
+        ) as mon:
+            proc = subprocess.run(cmd)
+        last_returncode = proc.returncode
+        summary = mon.summary
+        assert summary is not None
+        if i >= args.warmup_runs:
+            summaries.append(summary)
 
-    summary = mon.summary
-    assert summary is not None, "summary should be set after GpuMonitor.__exit__"
-
-    if args.json:
-        print(json.dumps(summary.__dict__, sort_keys=True))
+    if args.repeats == 1:
+        # Single run — same output as before.
+        if args.json:
+            print(json.dumps(summaries[0].__dict__, sort_keys=True))
+        else:
+            print(summaries[0].format())
     else:
-        print(summary.format())
+        # Multi-run — show cross-run statistics.
+        result = MultiRunResult.from_runs(summaries, value=None)
+        if args.json:
+            data = {
+                "repeats": len(result.runs),
+                "duration": result.duration.__dict__,
+                "util_gpu": result.util_gpu.__dict__,
+                "power": result.power.__dict__,
+                "energy": result.energy.__dict__,
+                "peak_memory": result.peak_memory.__dict__,
+                "peak_temp": result.peak_temp.__dict__,
+                "runs": [r.__dict__ for r in result.runs],
+            }
+            print(json.dumps(data, sort_keys=True))
+        else:
+            print(result.format())
 
-    return proc.returncode
+    return last_returncode
 
 
 if __name__ == "__main__":

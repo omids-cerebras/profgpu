@@ -7,26 +7,30 @@ It is designed for two common workflows:
 1. **Library mode** (import in Python)
    - A decorator (`@gpu_profile(...)`) for wrapping a function.
    - A context manager (`with GpuMonitor(...)`) for wrapping an arbitrary block.
+   - Multi-run benchmarking with `repeats` or `profile_repeats()`.
 
 2. **CLI mode** (profile a subprocess)
    - `profgpu -- python train.py ...` prints a summary at the end.
    - `profgpu --json -- ...` emits machine-friendly JSON.
+   - `profgpu --repeats 5 -- ...` runs multiple times with cross-run statistics.
 
 ## What it measures
 
 The primary signal is **device-level utilization**:
 
-- `util.gpu` — typically “% of time the GPU was busy” over the driver’s sampling window.
-- `util.mem` — memory controller utilization (%), a rough proxy for memory pressure.
+- `util.gpu` --- typically "% of time the GPU was busy" over the driver's sampling window.
+- `util.mem` --- memory controller utilization (%), a rough proxy for memory pressure.
 
-Optionally (depending on backend / driver support) it also samples:
+Each profiling session produces a `GpuSummary` with 30 fields including:
 
-- memory used / total
-- power draw (W)
-- temperature (°C)
-- SM and memory clocks
+- GPU utilization: mean, std, min, max, p5, p50, p95, p99
+- Idle/active classification: idle_pct (<5%), active_pct (>=50%)
+- Memory: used mean/max, total, utilization %
+- Power: mean/max watts, total energy (joules)
+- Temperature: mean/max
+- Clocks: SM mean/max
 
-> Important: `util.gpu = 90%` does **not** mean “90% of peak FLOPS.” It usually means the GPU had *some* work running 90% of the time.
+> Important: `util.gpu = 90%` does **not** mean "90% of peak FLOPS." It usually means the GPU had *some* work running 90% of the time.
 
 ## Backends
 
@@ -40,6 +44,8 @@ Today the package targets **NVIDIA** GPUs (NVML / nvidia-smi). The public API is
 
 ## Quick example
 
+### Single run
+
 ```python
 from profgpu import gpu_profile
 
@@ -51,7 +57,23 @@ def work():
 work()
 ```
 
-If you’re using a framework that schedules GPU work asynchronously (e.g. **PyTorch**, **CuPy**), pass a `sync_fn` so the decorator boundaries match “all GPU work launched by the function”:
+### Multi-run benchmarking
+
+```python
+from profgpu import gpu_profile
+
+@gpu_profile(repeats=5, warmup_runs=1, return_profile=True)
+def bench():
+    ...
+
+result = bench()  # MultiRunResult
+print(f"util: {result.util_gpu.mean:.1f}% +- {result.util_gpu.std:.1f}%")
+print(f"duration: {result.duration.format('s', 3)}")
+```
+
+### PyTorch with sync
+
+If you're using a framework that schedules GPU work asynchronously (e.g. **PyTorch**, **CuPy**), pass a `sync_fn` so the decorator boundaries match "all GPU work launched by the function":
 
 ```python
 import torch
@@ -74,3 +96,4 @@ matmul_bench()
 - **Understand the metrics**: see [Concepts](concepts.md)
 - **Concrete walkthroughs**: see [Tutorials](tutorials/pytorch.md)
 - **Run the Jupyter notebooks**: see [Notebooks](notebooks.md)
+- **Full API**: see [API reference](api.md)

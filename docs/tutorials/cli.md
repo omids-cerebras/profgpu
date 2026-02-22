@@ -15,7 +15,7 @@ The CLI wraps your command, samples GPU metrics while it runs, and prints a summ
 profgpu -- python train.py --epochs 3
 ```
 
-Use `--` to separate `profgpu` arguments from your command’s arguments.
+Use `--` to separate `profgpu` arguments from your command's arguments.
 
 ## Choosing device and interval
 
@@ -67,9 +67,33 @@ profgpu --torch-sync -- python train.py
 
 This is equivalent to passing `sync_fn=torch.cuda.synchronize` in library mode.
 
+## Multi-run profiling
+
+Run your command multiple times and get cross-run statistics:
+
+```bash
+profgpu --repeats 5 -- python train.py
+```
+
+Discard the first run as warmup:
+
+```bash
+profgpu --repeats 5 --warmup-runs 1 -- python train.py
+```
+
+The output shows mean, std, min, max for duration, GPU utilization, power, energy, peak memory, and peak temperature across all measured runs.
+
+### JSON multi-run output
+
+```bash
+profgpu --repeats 5 --warmup-runs 1 --json -- python train.py
+```
+
+The JSON output includes a `"runs"` array with per-run summaries and top-level cross-run stats.
+
 ## Exit codes
 
-`profgpu` returns your command’s exit code.
+`profgpu` returns your command's exit code.
 
 That means you can safely use it in CI:
 

@@ -75,15 +75,13 @@ log "Activating '${ENV_NAME}' and installing profgpu[dev,nvml]"
 $CONDA run -n "${ENV_NAME}" \
     pip install -e ".[dev,nvml]"
 
-# --- 5. (Optional) install PyTorch – uncomment to include ------------
-# Keeping this commented so the base env stays lean.  Uncomment one of
-# the lines below if you want PyTorch bundled in the environment.
-#
-# $CONDA run -n "${ENV_NAME}" \
-#     pip install torch --index-url https://download.pytorch.org/whl/cu124
-#
-# $CONDA run -n "${ENV_NAME}" \
-#     conda install -c pytorch -c nvidia pytorch pytorch-cuda=${CUDA_VERSION}
+# --- 5. Install PyTorch (CUDA wheels) --------------------------------
+# PyTorch publishes wheels per CUDA version.  cu124 wheels are
+# forward-compatible with any CUDA 12.x driver (12.4, 12.6, etc.).
+# There is NO cu126 index — use cu124 for all CUDA 12.x.
+log "Installing PyTorch (cu124 wheels — compatible with CUDA 12.x drivers)"
+$CONDA run -n "${ENV_NAME}" \
+    pip install torch --index-url https://download.pytorch.org/whl/cu124
 
 # --- 6. Verify --------------------------------------------------------
 log "Verifying installation"

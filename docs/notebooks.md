@@ -4,9 +4,9 @@ This repo includes a set of **concrete, runnable notebooks** in the `notebooks/`
 
 They are written to be:
 
-- readable as tutorials even if you don’t run them
+- readable as tutorials even if you don't run them
 - runnable on any NVIDIA GPU environment that has PyTorch installed
-- robust to “no GPU” environments (they print a message and skip the heavy cells)
+- robust to "no GPU" environments (they print a message and skip the heavy cells)
 
 ## Running the notebooks
 
@@ -39,7 +39,7 @@ jupyter lab
   - Demonstrates per-epoch summaries.
 
 - **03_Async_Pitfalls.ipynb**
-  - Demonstrates the classic “CUDA is async” footgun.
+  - Demonstrates the classic "CUDA is async" footgun.
   - Shows how to measure correctly.
 
 - **04_CLI_Profile_Command.ipynb**
@@ -51,10 +51,16 @@ jupyter lab
 - **06_CuPy_Benchmark.ipynb**
   - Minimal CuPy example showing `sync_fn=cp.cuda.Stream.null.synchronize`.
 
+- **07_Multi_Run_Benchmarking.ipynb**
+  - Multi-run profiling with `repeats` and `warmup_runs`.
+  - Cross-run statistics (`RunStats`): mean, std, min, max.
+  - `profile_repeats()` non-decorator API.
+  - Comparing configurations with multi-run results.
+
 
 ## Notes
 
 - The notebooks assume **PyTorch** is installed.
-- They do *not* vendor or pin PyTorch versions, because that’s environment-specific.
+- They do *not* vendor or pin PyTorch versions, because that's environment-specific.
 
-If you want additional notebooks (e.g., CuPy, Triton, torch.compile), add an issue or PR.
+If you want additional notebooks (e.g., Triton, torch.compile), add an issue or PR.

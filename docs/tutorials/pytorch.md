@@ -94,7 +94,95 @@ Monitoring per-epoch is often the best first step because:
 - you can spot warmup vs steady-state
 - it avoids the overhead of monitoring every step
 
-## 3) Monitor just a step (micro-regions)
+## 3) Multi-run PyTorch benchmarking
+
+Use `repeats` and `warmup_runs` for statistically robust measurements:
+
+```python
+import torch
+from profgpu import gpu_profile
+
+SYNC = torch.cuda.synchronize
+
+@gpu_profile(
+    interval_s=0.1,
+    sync_fn=SYNC,
+    repeats=5,
+    warmup_runs=1,
+    return_profile=True,
+    report=False,
+)
+def matmul_bench(n: int = 8192, steps: int = 20):
+    a = torch.randn(n, n, device="cuda")
+    b = torch.randn(n, n, device="cuda")
+    for _ in range(steps):
+        _ = a @ b
+
+
+result = matmul_bench()  # MultiRunResult
+
+print(f"Duration:  {result.duration.format('s', 3)}")
+print(f"GPU util:  {result.util_gpu.format('%', 1)}")
+print(f"Power:     {result.power.format(' W', 1)}")
+print(f"Energy:    {result.energy.format(' J', 1)}")
+print(f"Peak mem:  {result.peak_memory.format(' MB', 0)}")
+print(f"Peak temp: {result.peak_temp.format(' C', 0)}")
+```
+
+### With `profile_repeats` (non-decorator)
+
+```python
+import torch
+from profgpu import profile_repeats
+
+SYNC = torch.cuda.synchronize
+
+def train_epoch(model, loader, opt, loss_fn, device):
+    model.train()
+    for x, y in loader:
+        x, y = x.to(device), y.to(device)
+        opt.zero_grad(set_to_none=True)
+        loss = loss_fn(model(x), y)
+        loss.backward()
+        opt.step()
+
+result = profile_repeats(
+    lambda: train_epoch(model, loader, opt, loss_fn, "cuda"),
+    repeats=3,
+    warmup_runs=1,
+    interval_s=0.2,
+    sync_fn=SYNC,
+)
+print(result.format())
+```
+
+### Comparing configurations
+
+Multi-run profiling makes it easy to compare configurations:
+
+```python
+import torch
+from profgpu import profile_repeats
+
+SYNC = torch.cuda.synchronize
+REPEATS = 5
+
+for batch_size in [32, 64, 128, 256]:
+    result = profile_repeats(
+        lambda bs=batch_size: run_with_batch_size(bs),
+        repeats=REPEATS,
+        warmup_runs=1,
+        sync_fn=SYNC,
+        report=False,
+    )
+    print(
+        f"bs={batch_size:4d}  "
+        f"util={result.util_gpu.mean:.1f}+-{result.util_gpu.std:.1f}%  "
+        f"time={result.duration.mean:.3f}+-{result.duration.std:.3f}s"
+    )
+```
+
+## 4) Monitor just a step (micro-regions)
 
 If you want to measure a single batch step, keep the sampling interval small and the region long enough to collect a few samples.
 
@@ -116,7 +204,7 @@ print(mon.summary.format())
 
 If you measure *one* extremely fast step, you may see little signal simply because the sampling window is coarser than the operation.
 
-## 4) Split “data loading” vs “compute”
+## 5) Split "data loading" vs "compute"
 
 A common question is:
 
@@ -144,9 +232,9 @@ print("data", data_mon.summary.util_gpu_mean)
 print("compute", compute_mon.summary.util_gpu_mean)
 ```
 
-Be careful: moving data to the GPU can be asynchronous too (non-blocking H2D). If you want “transfer time included,” keep `sync_fn`.
+Be careful: moving data to the GPU can be asynchronous too (non-blocking H2D). If you want "transfer time included," keep `sync_fn`.
 
-## 5) Multi-GPU
+## 6) Multi-GPU
 
 If you have multiple GPUs, set the `device` parameter:
 
@@ -157,7 +245,7 @@ with GpuMonitor(device=1, interval_s=0.2, sync_fn=torch.cuda.synchronize) as mon
 
 For DDP, each process usually uses one GPU. Run the monitor in each process and write JSON summaries to separate files.
 
-## 6) When `util.gpu` looks wrong
+## 7) When `util.gpu` looks wrong
 
 If you see unexpectedly low utilization:
 
@@ -166,7 +254,9 @@ If you see unexpectedly low utilization:
 - reduce CPU bottlenecks (data loader, preprocessing)
 - look at batch size / kernel launch overhead
 
-For deeper analysis, you’ll typically move to Nsight Systems/Compute.
+Check `idle_pct` and `active_pct` for quick classification: high `idle_pct` means many samples had near-zero utilization.
+
+For deeper analysis, you'll typically move to Nsight Systems/Compute.
 
 ---
 

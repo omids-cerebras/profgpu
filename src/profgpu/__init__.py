@@ -17,7 +17,7 @@ Backends (from lowest to highest overhead):
   testing or graceful degradation.
 """
 
-__version__: str = "0.2.0"
+__version__: str = "0.3.0"
 
 from typing import List
 
@@ -26,8 +26,11 @@ from .monitor import (
     GpuMonitor,
     GpuSample,
     GpuSummary,
+    MultiRunResult,
     ProfiledResult,
+    RunStats,
     gpu_profile,
+    profile_repeats,
 )
 
 __all__: List[str] = [
@@ -35,6 +38,9 @@ __all__: List[str] = [
     "GpuMonitor",
     "GpuSample",
     "GpuSummary",
+    "MultiRunResult",
     "ProfiledResult",
+    "RunStats",
     "gpu_profile",
+    "profile_repeats",
 ]

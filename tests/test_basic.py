@@ -25,8 +25,10 @@ from profgpu import (
     GpuMonitor,
     GpuSample,
     GpuSummary,
+    MultiRunResult,
     ProfiledResult,
     gpu_profile,
+    profile_repeats,
 )
 from profgpu.monitor import (
     METRIC_KEYS,
@@ -34,9 +36,49 @@ from profgpu.monitor import (
     NullGpuBackend,
     NvidiaSmiBackend,
     _Aggregator,
+    _compute_run_stats,
     _percentile,
     _sparkline,
 )
+
+
+def _make_summary(**overrides) -> GpuSummary:
+    """Build a GpuSummary with sensible defaults; override any field via kwargs."""
+    defaults = dict(
+        device=0,
+        name="TestGPU",
+        duration_s=1.0,
+        interval_s=0.1,
+        n_samples=10,
+        util_gpu_mean=50.0,
+        util_gpu_std=10.0,
+        util_gpu_min=20.0,
+        util_gpu_max=80.0,
+        util_gpu_p5=22.0,
+        util_gpu_p50=50.0,
+        util_gpu_p95=78.0,
+        util_gpu_p99=80.0,
+        idle_pct=0.0,
+        active_pct=60.0,
+        util_mem_mean=30.0,
+        mem_used_mean_mb=4000.0,
+        mem_used_max_mb=6000.0,
+        mem_total_mb=8192.0,
+        mem_util_pct=73.2,
+        power_mean_w=100.0,
+        power_max_w=150.0,
+        energy_j=100.0,
+        temp_mean_c=55.0,
+        temp_max_c=60.0,
+        sm_clock_mean_mhz=1400.0,
+        sm_clock_max_mhz=1600.0,
+        busy_time_est_s=0.5,
+        sparkline="",
+        notes="",
+    )
+    defaults.update(overrides)
+    return GpuSummary(**defaults)
+
 
 # ===================================================================
 # Utilities: helper backends for testing
@@ -304,6 +346,8 @@ class TestAggregator:
         q = agg.util_gpu_quantiles()
         assert abs(q["p50"] - 50.0) < 5.0
         assert abs(q["p95"] - 95.0) < 5.0
+        assert abs(q["p5"] - 5.0) < 5.0
+        assert abs(q["p99"] - 99.0) < 5.0
 
     def test_missing_metrics_handled(self) -> None:
         agg = _Aggregator(warmup_s=0, reservoir_size=64, trace_len=40)
@@ -322,6 +366,94 @@ class TestAggregator:
     def test_trace_len_floor(self) -> None:
         agg = _Aggregator(warmup_s=0, reservoir_size=64, trace_len=1)
         assert agg.trace_len >= 40
+
+    # --- Extended metric tests (v0.3+) ---
+
+    def test_util_gpu_min(self) -> None:
+        agg = _Aggregator(warmup_s=0, reservoir_size=64, trace_len=40)
+        for v in [80.0, 20.0, 60.0, 10.0, 50.0]:
+            agg.add(0.0, self._make_metrics(util_gpu=v))
+        assert math.isclose(agg.util_gpu_min, 10.0)
+
+    def test_util_gpu_min_nan_when_empty(self) -> None:
+        agg = _Aggregator(warmup_s=0, reservoir_size=64, trace_len=40)
+        assert math.isnan(agg.util_gpu_min)
+
+    def test_util_gpu_std_constant(self) -> None:
+        agg = _Aggregator(warmup_s=0, reservoir_size=64, trace_len=40)
+        for _ in range(10):
+            agg.add(0.0, self._make_metrics(util_gpu=50.0))
+        assert math.isclose(agg.util_gpu_std(), 0.0, abs_tol=1e-9)
+
+    def test_util_gpu_std_variable(self) -> None:
+        agg = _Aggregator(warmup_s=0, reservoir_size=64, trace_len=40)
+        for v in [0.0, 100.0]:
+            agg.add(0.0, self._make_metrics(util_gpu=v))
+        assert math.isclose(agg.util_gpu_std(), 50.0, abs_tol=0.1)
+
+    def test_util_gpu_std_nan_single_sample(self) -> None:
+        agg = _Aggregator(warmup_s=0, reservoir_size=64, trace_len=40)
+        agg.add(0.0, self._make_metrics(util_gpu=50.0))
+        assert math.isnan(agg.util_gpu_std())
+
+    def test_idle_pct(self) -> None:
+        agg = _Aggregator(warmup_s=0, reservoir_size=64, trace_len=40)
+        # 3 idle (<5%), 2 not idle
+        for v in [0.0, 2.0, 4.9, 50.0, 100.0]:
+            agg.add(0.0, self._make_metrics(util_gpu=v))
+        assert math.isclose(agg.idle_pct(), 60.0)
+
+    def test_active_pct(self) -> None:
+        agg = _Aggregator(warmup_s=0, reservoir_size=64, trace_len=40)
+        # 3 active (>=50%), 2 not active
+        for v in [0.0, 10.0, 50.0, 75.0, 100.0]:
+            agg.add(0.0, self._make_metrics(util_gpu=v))
+        assert math.isclose(agg.active_pct(), 60.0)
+
+    def test_idle_active_nan_when_empty(self) -> None:
+        agg = _Aggregator(warmup_s=0, reservoir_size=64, trace_len=40)
+        assert math.isnan(agg.idle_pct())
+        assert math.isnan(agg.active_pct())
+
+    def test_mem_used_mean_mb(self) -> None:
+        agg = _Aggregator(warmup_s=0, reservoir_size=64, trace_len=40)
+        for v in [1000.0, 2000.0, 3000.0, 4000.0, 5000.0]:
+            agg.add(0.0, self._make_metrics(mem_used_mb=v))
+        assert math.isclose(agg.mem_used_mean_mb(), 3000.0)
+
+    def test_mem_used_mean_nan_when_empty(self) -> None:
+        agg = _Aggregator(warmup_s=0, reservoir_size=64, trace_len=40)
+        assert math.isnan(agg.mem_used_mean_mb())
+
+    def test_sm_clock_mean_mhz(self) -> None:
+        agg = _Aggregator(warmup_s=0, reservoir_size=64, trace_len=40)
+        for v in [1200.0, 1400.0, 1600.0]:
+            agg.add(0.0, self._make_metrics(sm_clock_mhz=v))
+        assert math.isclose(agg.sm_clock_mean_mhz(), 1400.0)
+
+    def test_sm_clock_max_mhz(self) -> None:
+        agg = _Aggregator(warmup_s=0, reservoir_size=64, trace_len=40)
+        for v in [1200.0, 1600.0, 1400.0]:
+            agg.add(0.0, self._make_metrics(sm_clock_mhz=v))
+        assert math.isclose(agg.sm_clock_max_mhz, 1600.0)
+
+    def test_temp_mean_c(self) -> None:
+        agg = _Aggregator(warmup_s=0, reservoir_size=64, trace_len=40)
+        for v in [60.0, 70.0, 80.0]:
+            agg.add(0.0, self._make_metrics(temp_c=v))
+        assert math.isclose(agg.temp_mean_c(), 70.0)
+
+    def test_quantiles_return_all_four_keys(self) -> None:
+        agg = _Aggregator(warmup_s=0, reservoir_size=64, trace_len=40)
+        agg.add(0.0, self._make_metrics(util_gpu=50.0))
+        q = agg.util_gpu_quantiles()
+        assert set(q.keys()) == {"p5", "p50", "p95", "p99"}
+
+    def test_quantiles_empty_returns_nan(self) -> None:
+        agg = _Aggregator(warmup_s=0, reservoir_size=64, trace_len=40)
+        q = agg.util_gpu_quantiles()
+        for key in ["p5", "p50", "p95", "p99"]:
+            assert math.isnan(q[key])
 
 
 # ===================================================================
@@ -375,25 +507,28 @@ class TestGpuSummary:
 
     @pytest.fixture()
     def summary(self) -> GpuSummary:
-        return GpuSummary(
-            device=0,
-            name="TestGPU",
+        return _make_summary(
             duration_s=10.0,
             interval_s=0.2,
             n_samples=50,
             util_gpu_mean=65.0,
+            util_gpu_std=15.3,
+            util_gpu_min=10.0,
+            util_gpu_max=98.0,
+            util_gpu_p5=12.0,
             util_gpu_p50=62.0,
             util_gpu_p95=90.0,
-            util_gpu_max=98.0,
-            util_mem_mean=40.0,
-            mem_used_max_mb=6000.0,
-            mem_total_mb=8192.0,
+            util_gpu_p99=97.0,
+            idle_pct=5.0,
+            active_pct=80.0,
             power_mean_w=180.0,
             power_max_w=250.0,
+            temp_mean_c=68.0,
             temp_max_c=75.0,
-            busy_time_est_s=6.5,
+            energy_j=1800.0,
+            mem_used_mean_mb=4500.0,
             sparkline="▁▃▅▇",
-            notes="",
+            busy_time_est_s=6.5,
         )
 
     def test_format_contains_device(self, summary: GpuSummary) -> None:
@@ -411,24 +546,91 @@ class TestGpuSummary:
     def test_format_contains_sparkline(self, summary: GpuSummary) -> None:
         assert "▁▃▅▇" in summary.format()
 
-    def test_format_nan_shows_na(self) -> None:
-        s = GpuSummary(
-            device=0,
+    def test_format_contains_extended_metrics(self, summary: GpuSummary) -> None:
+        text = summary.format()
+        # std and min
+        assert "std" in text.lower()
+        assert "min" in text.lower()
+        # percentiles p5 / p99
+        assert "p5" in text
+        assert "p99" in text
+        # idle / active
+        assert "idle" in text.lower()
+        assert "active" in text.lower()
+        # energy
+        assert "energy" in text.lower() or "J" in text
+        # clocks
+        assert "MHz" in text
+        # mean temp
+        assert "68" in text  # temp_mean_c
+
+    def test_format_all_nan_graceful(self) -> None:
+        """All-NaN fields format gracefully without crashing."""
+        nan = float("nan")
+        s = _make_summary(
             name="N/A",
             duration_s=0.0,
-            interval_s=0.1,
             n_samples=0,
-            util_gpu_mean=float("nan"),
-            util_gpu_p50=float("nan"),
-            util_gpu_p95=float("nan"),
-            util_gpu_max=float("nan"),
-            util_mem_mean=float("nan"),
-            mem_used_max_mb=float("nan"),
-            mem_total_mb=float("nan"),
-            power_mean_w=float("nan"),
-            power_max_w=float("nan"),
-            temp_max_c=float("nan"),
-            busy_time_est_s=float("nan"),
+            util_gpu_mean=nan,
+            util_gpu_std=nan,
+            util_gpu_min=nan,
+            util_gpu_max=nan,
+            util_gpu_p5=nan,
+            util_gpu_p50=nan,
+            util_gpu_p95=nan,
+            util_gpu_p99=nan,
+            idle_pct=nan,
+            active_pct=nan,
+            util_mem_mean=nan,
+            mem_used_mean_mb=nan,
+            mem_used_max_mb=nan,
+            mem_total_mb=nan,
+            mem_util_pct=nan,
+            power_mean_w=nan,
+            power_max_w=nan,
+            energy_j=nan,
+            temp_mean_c=nan,
+            temp_max_c=nan,
+            sm_clock_mean_mhz=nan,
+            sm_clock_max_mhz=nan,
+            busy_time_est_s=nan,
+            sparkline="",
+            notes="",
+        )
+        text = s.format()
+        assert isinstance(text, str)
+        assert "[GPU 0]" in text
+        assert "n/a" in text
+
+    def test_format_nan_shows_na(self) -> None:
+        nan = float("nan")
+        s = _make_summary(
+            name="N/A",
+            duration_s=0.0,
+            n_samples=0,
+            util_gpu_mean=nan,
+            util_gpu_std=nan,
+            util_gpu_min=nan,
+            util_gpu_max=nan,
+            util_gpu_p5=nan,
+            util_gpu_p50=nan,
+            util_gpu_p95=nan,
+            util_gpu_p99=nan,
+            idle_pct=nan,
+            active_pct=nan,
+            util_mem_mean=nan,
+            mem_used_mean_mb=nan,
+            mem_used_max_mb=nan,
+            mem_total_mb=nan,
+            mem_util_pct=nan,
+            power_mean_w=nan,
+            power_max_w=nan,
+            energy_j=nan,
+            temp_mean_c=nan,
+            temp_max_c=nan,
+            sm_clock_mean_mhz=nan,
+            sm_clock_max_mhz=nan,
+            busy_time_est_s=nan,
             sparkline="",
             notes="no GPU",
         )
@@ -437,49 +639,18 @@ class TestGpuSummary:
         assert "no GPU" in text
 
     def test_format_with_notes(self) -> None:
-        s = GpuSummary(
+        s = _make_summary(
             device=1,
             name="GPU1",
             duration_s=5.0,
-            interval_s=0.1,
             n_samples=50,
-            util_gpu_mean=50.0,
-            util_gpu_p50=50.0,
-            util_gpu_p95=50.0,
-            util_gpu_max=50.0,
-            util_mem_mean=30.0,
-            mem_used_max_mb=4000.0,
-            mem_total_mb=8192.0,
-            power_mean_w=100.0,
-            power_max_w=150.0,
-            temp_max_c=60.0,
             busy_time_est_s=2.5,
-            sparkline="",
             notes="warmup ignored: first 1.00s",
         )
         assert "warmup ignored" in s.format()
 
     def test_frozen(self) -> None:
-        s = GpuSummary(
-            device=0,
-            name="X",
-            duration_s=1.0,
-            interval_s=0.1,
-            n_samples=10,
-            util_gpu_mean=50.0,
-            util_gpu_p50=50.0,
-            util_gpu_p95=50.0,
-            util_gpu_max=50.0,
-            util_mem_mean=30.0,
-            mem_used_max_mb=4000.0,
-            mem_total_mb=8192.0,
-            power_mean_w=100.0,
-            power_max_w=150.0,
-            temp_max_c=60.0,
-            busy_time_est_s=0.5,
-            sparkline="",
-            notes="",
-        )
+        s = _make_summary()
         with pytest.raises(AttributeError):
             s.device = 1  # type: ignore[misc]
 
@@ -492,36 +663,14 @@ class TestGpuSummary:
 class TestProfiledResult:
     """Tests for the ProfiledResult wrapper."""
 
-    def _make_summary(self) -> GpuSummary:
-        return GpuSummary(
-            device=0,
-            name="X",
-            duration_s=1.0,
-            interval_s=0.1,
-            n_samples=10,
-            util_gpu_mean=50.0,
-            util_gpu_p50=50.0,
-            util_gpu_p95=50.0,
-            util_gpu_max=50.0,
-            util_mem_mean=30.0,
-            mem_used_max_mb=4000.0,
-            mem_total_mb=8192.0,
-            power_mean_w=100.0,
-            power_max_w=150.0,
-            temp_max_c=60.0,
-            busy_time_est_s=0.5,
-            sparkline="",
-            notes="",
-        )
-
     def test_fields(self) -> None:
-        s = self._make_summary()
+        s = _make_summary()
         pr = ProfiledResult(value=42, gpu=s)
         assert pr.value == 42
         assert pr.gpu is s
 
     def test_frozen(self) -> None:
-        pr = ProfiledResult(value="hello", gpu=self._make_summary())
+        pr = ProfiledResult(value="hello", gpu=_make_summary())
         with pytest.raises(AttributeError):
             pr.value = "bye"  # type: ignore[misc]
 
@@ -634,6 +783,52 @@ class TestGpuMonitorWithConstantBackend:
             time.sleep(0.03)
         assert mon.summary.name == "TestGPU"
 
+    def test_extended_summary_fields_populated(self) -> None:
+        """Verify all 12 extended metrics are populated (not NaN) with ConstantBackend."""
+        mon = self._make_monitor(interval_s=0.01)
+        with mon:
+            time.sleep(0.15)
+        s = mon.summary
+        assert s is not None
+        assert s.n_samples >= 5
+        # ConstantBackend returns util_gpu=50 every sample
+        if s.n_samples >= 2:
+            assert not math.isnan(s.util_gpu_min)
+            assert not math.isnan(s.util_gpu_std)
+            assert not math.isnan(s.util_gpu_p5)
+            assert not math.isnan(s.util_gpu_p99)
+            assert not math.isnan(s.idle_pct)
+            assert not math.isnan(s.active_pct)
+            assert not math.isnan(s.mem_used_mean_mb)
+            assert not math.isnan(s.mem_util_pct)
+            assert not math.isnan(s.energy_j)
+            assert not math.isnan(s.sm_clock_mean_mhz)
+            assert not math.isnan(s.sm_clock_max_mhz)
+            assert not math.isnan(s.temp_mean_c)
+
+    def test_extended_summary_values_correct(self) -> None:
+        """Verify numeric correctness of extended metrics with ConstantBackend."""
+        mon = self._make_monitor(interval_s=0.01)
+        with mon:
+            time.sleep(0.15)
+        s = mon.summary
+        assert s is not None
+        if s.n_samples >= 5:
+            # util_gpu=50 constant → min=50, std≈0, idle=0%, active=100%
+            assert math.isclose(s.util_gpu_min, 50.0, abs_tol=0.1)
+            assert math.isclose(s.util_gpu_std, 0.0, abs_tol=0.1)
+            assert math.isclose(s.idle_pct, 0.0, abs_tol=0.1)
+            assert math.isclose(s.active_pct, 100.0, abs_tol=0.1)
+            # mem_used=4096, mem_total=8192 → util=50%
+            assert math.isclose(s.mem_util_pct, 50.0, abs_tol=0.1)
+            # sm_clock constant at 1500
+            assert math.isclose(s.sm_clock_mean_mhz, 1500.0, abs_tol=0.1)
+            assert math.isclose(s.sm_clock_max_mhz, 1500.0, abs_tol=0.1)
+            # temp constant at 65
+            assert math.isclose(s.temp_mean_c, 65.0, abs_tol=0.1)
+            # energy = power_mean * duration
+            assert s.energy_j > 0.0
+
 
 class TestGpuMonitorWithRampBackend:
     """Tests with a ramping backend to verify aggregation correctness."""
@@ -660,6 +855,21 @@ class TestGpuMonitorWithRampBackend:
         assert s is not None
         if not math.isnan(s.util_gpu_mean):
             assert 20.0 < s.util_gpu_mean < 80.0
+
+    def test_ramp_extended_metrics(self) -> None:
+        """Ramping util_gpu from 0→100 should have high std & mixed idle/active."""
+        mon = self._make_monitor(interval_s=0.005)
+        with mon:
+            time.sleep(0.5)
+        s = mon.summary
+        assert s is not None
+        if s.n_samples >= 10:
+            # min should be near 0
+            assert s.util_gpu_min < 20.0
+            # std should be non-trivial (ramp has high variance)
+            assert s.util_gpu_std > 10.0
+            # Should have some idle samples (ramp starts at 0)
+            assert s.idle_pct > 0.0
 
 
 class TestGpuMonitorWithFailingBackend:
@@ -1068,8 +1278,11 @@ class TestPackageExports:
             "GpuMonitor",
             "GpuSample",
             "GpuSummary",
+            "MultiRunResult",
             "ProfiledResult",
+            "RunStats",
             "gpu_profile",
+            "profile_repeats",
         ]:
             assert hasattr(profgpu, name)
 
@@ -1127,71 +1340,263 @@ class TestEdgeCases:
             assert abs(s.busy_time_est_s - expected) < 0.15
 
     def test_format_without_sparkline(self) -> None:
-        s = GpuSummary(
-            device=0,
-            name="X",
-            duration_s=1.0,
-            interval_s=0.1,
-            n_samples=0,
-            util_gpu_mean=float("nan"),
-            util_gpu_p50=float("nan"),
-            util_gpu_p95=float("nan"),
-            util_gpu_max=float("nan"),
-            util_mem_mean=float("nan"),
-            mem_used_max_mb=float("nan"),
-            mem_total_mb=float("nan"),
-            power_mean_w=float("nan"),
-            power_max_w=float("nan"),
-            temp_max_c=float("nan"),
-            busy_time_est_s=float("nan"),
-            sparkline="",
-            notes="",
-        )
+        s = _make_summary(n_samples=0, sparkline="")
         assert "util trace" not in s.format()
 
     def test_format_without_notes(self) -> None:
-        s = GpuSummary(
-            device=0,
-            name="X",
-            duration_s=1.0,
-            interval_s=0.1,
-            n_samples=10,
-            util_gpu_mean=50.0,
-            util_gpu_p50=50.0,
-            util_gpu_p95=50.0,
-            util_gpu_max=50.0,
-            util_mem_mean=30.0,
-            mem_used_max_mb=4000.0,
-            mem_total_mb=8192.0,
-            power_mean_w=100.0,
-            power_max_w=150.0,
-            temp_max_c=60.0,
-            busy_time_est_s=0.5,
-            sparkline="",
-            notes="",
-        )
+        s = _make_summary(notes="")
         assert "notes:" not in s.format()
 
     def test_format_memory_hidden_when_nan(self) -> None:
         """When mem_total_mb is NaN the memory line should be omitted."""
-        s = GpuSummary(
-            device=0,
-            name="X",
-            duration_s=1.0,
-            interval_s=0.1,
-            n_samples=10,
-            util_gpu_mean=50.0,
-            util_gpu_p50=50.0,
-            util_gpu_p95=50.0,
-            util_gpu_max=50.0,
-            util_mem_mean=30.0,
-            mem_used_max_mb=float("nan"),
-            mem_total_mb=float("nan"),
-            power_mean_w=100.0,
-            power_max_w=150.0,
-            temp_max_c=60.0,
-            busy_time_est_s=0.5,
-            sparkline="",
-            notes="",
+        nan = float("nan")
+        s = _make_summary(
+            mem_used_mean_mb=nan,
+            mem_used_max_mb=nan,
+            mem_total_mb=nan,
+            mem_util_pct=nan,
         )
         assert "memory:" not in s.format()
+
+
+# ===================================================================
+# RunStats
+# ===================================================================
+
+
+class TestRunStats:
+    """Tests for the RunStats dataclass and _compute_run_stats helper."""
+
+    def test_single_value(self) -> None:
+        rs = _compute_run_stats([42.0])
+        assert math.isclose(rs.mean, 42.0)
+        assert math.isnan(rs.std)  # can't compute std from 1 sample
+        assert math.isclose(rs.min, 42.0)
+        assert math.isclose(rs.max, 42.0)
+
+    def test_two_values(self) -> None:
+        rs = _compute_run_stats([40.0, 60.0])
+        assert math.isclose(rs.mean, 50.0)
+        assert rs.std > 0
+        assert math.isclose(rs.min, 40.0)
+        assert math.isclose(rs.max, 60.0)
+
+    def test_constant_values(self) -> None:
+        rs = _compute_run_stats([10.0, 10.0, 10.0])
+        assert math.isclose(rs.mean, 10.0)
+        assert math.isclose(rs.std, 0.0, abs_tol=1e-12)
+
+    def test_empty_returns_nan(self) -> None:
+        rs = _compute_run_stats([])
+        assert math.isnan(rs.mean)
+
+    def test_all_nan_returns_nan(self) -> None:
+        rs = _compute_run_stats([float("nan"), float("nan")])
+        assert math.isnan(rs.mean)
+
+    def test_mixed_nan_ignored(self) -> None:
+        rs = _compute_run_stats([10.0, float("nan"), 30.0])
+        assert math.isclose(rs.mean, 20.0)
+
+    def test_values_tuple_preserved(self) -> None:
+        rs = _compute_run_stats([1.0, 2.0, 3.0])
+        assert rs.values == (1.0, 2.0, 3.0)
+
+    def test_format_output(self) -> None:
+        rs = _compute_run_stats([50.0, 60.0, 70.0])
+        text = rs.format("%", 1)
+        assert "±" in text
+        assert "range" in text
+
+    def test_frozen(self) -> None:
+        rs = _compute_run_stats([1.0, 2.0])
+        with pytest.raises(AttributeError):
+            rs.mean = 99.0  # type: ignore[misc]
+
+
+# ===================================================================
+# MultiRunResult
+# ===================================================================
+
+
+class TestMultiRunResult:
+    """Tests for the MultiRunResult dataclass."""
+
+    @staticmethod
+    def _make_summaries(n: int = 3) -> List[GpuSummary]:
+        return [
+            _make_summary(
+                duration_s=1.0 + i * 0.1,
+                util_gpu_mean=50.0 + i * 5.0,
+                power_mean_w=100.0 + i * 10.0,
+                energy_j=100.0 + i * 10.0,
+                mem_used_max_mb=4000.0 + i * 100.0,
+                temp_max_c=60.0 + i * 2.0,
+            )
+            for i in range(n)
+        ]
+
+    def test_from_runs(self) -> None:
+        runs = self._make_summaries(3)
+        result = MultiRunResult.from_runs(runs, value=42)
+        assert result.value == 42
+        assert len(result.runs) == 3
+
+    def test_cross_run_stats(self) -> None:
+        runs = self._make_summaries(3)
+        result = MultiRunResult.from_runs(runs, value=None)
+        assert math.isclose(result.util_gpu.mean, 55.0, abs_tol=0.1)
+        assert result.util_gpu.std > 0
+
+    def test_stats_for_arbitrary_field(self) -> None:
+        runs = self._make_summaries(3)
+        result = MultiRunResult.from_runs(runs, value=None)
+        rs = result.stats_for("util_gpu_p50")
+        assert not math.isnan(rs.mean)
+
+    def test_format(self) -> None:
+        runs = self._make_summaries(3)
+        result = MultiRunResult.from_runs(runs, value=None)
+        text = result.format()
+        assert "Multi-Run" in text
+        assert "3 runs" in text
+        assert "util.gpu" in text
+        assert "run 1" in text
+
+    def test_empty_runs(self) -> None:
+        result = MultiRunResult.from_runs([], value=None)
+        assert result.format() == "(no runs)"
+
+    def test_frozen(self) -> None:
+        result = MultiRunResult.from_runs(self._make_summaries(2), value=1)
+        with pytest.raises(AttributeError):
+            result.value = 99  # type: ignore[misc]
+
+
+# ===================================================================
+# Multi-run decorator and profile_repeats
+# ===================================================================
+
+
+class TestMultiRunDecorator:
+    """Tests for @gpu_profile(repeats=N) and profile_repeats()."""
+
+    def test_repeats_returns_multi_run_result(self) -> None:
+        @gpu_profile(
+            backend="none",
+            strict=False,
+            report=False,
+            return_profile=True,
+            repeats=3,
+        )
+        def f() -> int:
+            return 42
+
+        result = f()
+        assert isinstance(result, MultiRunResult)
+        assert len(result.runs) == 3
+        assert result.value == 42
+
+    def test_repeats_without_return_profile(self) -> None:
+        @gpu_profile(
+            backend="none",
+            strict=False,
+            report=False,
+            repeats=2,
+        )
+        def f() -> int:
+            return 7
+
+        assert f() == 7
+
+    def test_warmup_runs_excluded(self) -> None:
+        call_count = 0
+
+        @gpu_profile(
+            backend="none",
+            strict=False,
+            report=False,
+            return_profile=True,
+            repeats=2,
+            warmup_runs=1,
+        )
+        def f() -> int:
+            nonlocal call_count
+            call_count += 1
+            return call_count
+
+        result = f()
+        assert isinstance(result, MultiRunResult)
+        assert len(result.runs) == 2  # only 2 counted
+        assert call_count == 3  # 1 warmup + 2 measured
+        assert result.value == 3
+
+    def test_repeats_report_prints(self, capsys: pytest.CaptureFixture) -> None:
+        @gpu_profile(
+            backend="none",
+            strict=False,
+            report=True,
+            repeats=2,
+            interval_s=0.01,
+        )
+        def f() -> None:
+            pass
+
+        f()
+        captured = capsys.readouterr()
+        assert "Multi-Run" in captured.out
+
+    def test_single_repeat_returns_profiled_result(self) -> None:
+        @gpu_profile(
+            backend="none",
+            strict=False,
+            report=False,
+            return_profile=True,
+            repeats=1,
+        )
+        def f() -> int:
+            return 5
+
+        result = f()
+        assert isinstance(result, ProfiledResult)
+        assert result.value == 5
+
+    def test_profile_repeats_function(self) -> None:
+        call_count = 0
+
+        def work() -> int:
+            nonlocal call_count
+            call_count += 1
+            return call_count
+
+        result = profile_repeats(
+            work,
+            repeats=3,
+            warmup_runs=1,
+            backend="none",
+            strict=False,
+            report=False,
+        )
+        assert isinstance(result, MultiRunResult)
+        assert len(result.runs) == 3
+        assert call_count == 4  # 1 warmup + 3 measured
+
+    def test_profile_repeats_report(self, capsys: pytest.CaptureFixture) -> None:
+        result = profile_repeats(
+            lambda: None,
+            repeats=2,
+            backend="none",
+            strict=False,
+            report=True,
+            interval_s=0.01,
+        )
+        assert isinstance(result, MultiRunResult)
+        assert "Multi-Run" in capsys.readouterr().out
+
+    def test_invalid_repeats_raises(self) -> None:
+        with pytest.raises(ValueError, match="repeats"):
+            gpu_profile(backend="none", repeats=0)
+
+    def test_invalid_warmup_runs_raises(self) -> None:
+        with pytest.raises(ValueError, match="warmup_runs"):
+            gpu_profile(backend="none", warmup_runs=-1)

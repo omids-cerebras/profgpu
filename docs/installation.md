@@ -51,6 +51,31 @@ pip install -e .[dev]
 pytest
 ```
 
+## Installing PyTorch (for examples & notebooks)
+
+`profgpu` itself is dependency-light and does **not** require PyTorch.
+However, most examples and notebooks use PyTorch for GPU workloads.
+
+PyTorch ships separate wheels per CUDA version.  Pick the one matching
+your **CUDA driver** (shown by `nvidia-smi` in the top-right corner):
+
+| CUDA driver | Install command |
+|-------------|----------------|
+| 12.x (12.4, 12.6, …) | `pip install torch --index-url https://download.pytorch.org/whl/cu124` |
+| 11.8 | `pip install torch --index-url https://download.pytorch.org/whl/cu118` |
+| CPU only | `pip install torch --index-url https://download.pytorch.org/whl/cpu` |
+
+### Common pitfalls
+
+- **Wrong Python version** — PyTorch 2.x requires Python ≥ 3.9.
+  If you're on an older system Python (3.8), use the conda env
+  (`create_env.sh`) which installs Python 3.11.
+- **`cu126` doesn't exist** — PyTorch publishes `cu118` and `cu124`
+  wheel indexes. `cu124` is forward-compatible with CUDA 12.6 drivers.
+  There is no `cu126` index.
+- **Not in the conda env** — Make sure you `conda activate profgpu`
+  before running pip; the system python may be too old.
+
 ## Conda environment (recommended for old host toolchains)
 
 If your system has an outdated GCC or CUDA, the repo includes

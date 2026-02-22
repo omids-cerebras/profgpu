@@ -5,6 +5,7 @@ Programmatic GPU utilization profiling for Python:
 - **Decorator**: `@gpu_profile(...)`
 - **Context manager**: `with GpuMonitor(...)`
 - **CLI**: `profgpu -- python train.py`
+- **Multi-run**: `@gpu_profile(repeats=5)` or `profile_repeats(fn, repeats=5)`
 
 Primary target: **NVIDIA** GPUs.
 
@@ -12,7 +13,7 @@ Backends:
 - **NVML** (recommended, low overhead) via `nvidia-ml-py3`
 - **`nvidia-smi`** fallback
 
-> `util.gpu` should be interpreted as “% of time the device was busy” over a sampling window—not “% of peak FLOPS.”
+> `util.gpu` should be interpreted as "% of time the device was busy" over a sampling window---not "% of peak FLOPS."
 
 ---
 
@@ -36,6 +37,22 @@ pip install "profgpu[nvml] @ git+https://github.com/<you>/profgpu.git"
 pip install -e .[dev]
 pytest
 ```
+
+### Installing PyTorch (for examples & notebooks)
+
+`profgpu` itself does not require PyTorch, but most examples and notebooks
+use it. Install the version matching your **CUDA driver**:
+
+| CUDA driver version | pip install command |
+|---------------------|--------------------|
+| CUDA 12.x | `pip install torch --index-url https://download.pytorch.org/whl/cu124` |
+| CUDA 11.8 | `pip install torch --index-url https://download.pytorch.org/whl/cu118` |
+| CPU only | `pip install torch --index-url https://download.pytorch.org/whl/cpu` |
+
+> **Tip:** Check your CUDA driver with `nvidia-smi` (top right shows
+> "CUDA Version: 12.x"). PyTorch `cu124` wheels work with any CUDA
+> 12.x driver (12.4, 12.6, etc.) --- you do **not** need an exact match.
+> Python >= 3.9 is required for PyTorch 2.x.
 
 ### Conda environment (recommended for old host toolchains)
 
@@ -121,6 +138,32 @@ print(res.value)
 print(res.gpu.util_gpu_mean, res.gpu.util_gpu_p95)
 ```
 
+### Multi-run benchmarking
+
+Run your function multiple times to get mean, std, min, max across runs:
+
+```python
+from profgpu import gpu_profile
+
+@gpu_profile(repeats=5, warmup_runs=1, return_profile=True, report=False)
+def bench():
+    ...
+
+result = bench()  # MultiRunResult
+print(f"util: {result.util_gpu.mean:.1f}% +- {result.util_gpu.std:.1f}%")
+print(f"duration: {result.duration.format('s', 3)}")
+print(f"energy: {result.energy.format(' J', 1)}")
+```
+
+Or without a decorator:
+
+```python
+from profgpu import profile_repeats
+
+result = profile_repeats(lambda: my_function(), repeats=5, warmup_runs=1)
+print(result.format())
+```
+
 ---
 
 ## CLI
@@ -137,7 +180,13 @@ Emit JSON:
 profgpu --json -- python train.py
 ```
 
-Return code: the CLI returns your command’s exit code (safe for CI).
+Multi-run:
+
+```bash
+profgpu --repeats 5 --warmup-runs 1 -- python train.py
+```
+
+Return code: the CLI returns your command's exit code (safe for CI).
 
 ---
 
@@ -159,8 +208,8 @@ mkdocs serve
 
 ## Included tutorials & notebooks
 
-- `docs/tutorials/pytorch.md`: practical PyTorch patterns
-- `docs/tutorials/cli.md`: CLI recipes
+- `docs/tutorials/pytorch.md`: practical PyTorch patterns (including multi-run)
+- `docs/tutorials/cli.md`: CLI recipes (including `--repeats`)
 - `docs/tutorials/logging.md`: structured logging and exporting samples
 
 Notebooks (in `notebooks/`):
@@ -172,6 +221,7 @@ Notebooks (in `notebooks/`):
 - `04_CLI_Profile_Command.ipynb`
 - `05_Export_Samples_and_Plot.ipynb`
 - `06_CuPy_Benchmark.ipynb`
+- `07_Multi_Run_Benchmarking.ipynb`
 
 ---
 
