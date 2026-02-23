@@ -648,6 +648,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Peak Hardware TFLOPS">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#method-1-theoretical-from-cuda-device-properties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method 1 — Theoretical (from CUDA device properties)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#method-2-empirical-gemm-benchmark" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method 2 — Empirical GEMM benchmark
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -1036,6 +1064,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Peak Hardware TFLOPS">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#method-1-theoretical-from-cuda-device-properties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method 1 — Theoretical (from CUDA device properties)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#method-2-empirical-gemm-benchmark" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method 2 — Empirical GEMM benchmark
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -1321,72 +1377,123 @@ matrix multiplications, convolutions, reductions).  For Enformer:</p>
 <p>This is more accurate than estimation heuristics (e.g. <code>2 × MACs</code>) because it
 counts every operator, not just matmuls.</p>
 <h3 id="peak-hardware-tflops">Peak Hardware TFLOPS</h3>
-<p>The script maintains a lookup table of datasheet peak throughput for common
-NVIDIA GPUs across three precision modes:</p>
+<p>Rather than relying on a hardcoded lookup table of datasheet values, we
+<strong>estimate peak TFLOPS programmatically</strong> using two complementary methods:</p>
+<h4 id="method-1-theoretical-from-cuda-device-properties">Method 1 — Theoretical (from CUDA device properties)</h4>
+<p>Every CUDA device exposes its SM count, compute capability, and boost clock
+via <code>torch.cuda.get_device_properties()</code>.  Combined with a small table mapping
+compute capability → FP32 cores per SM, we compute:</p>
+<div class="arithmatex">\[
+\text{Theoretical Peak} = \frac{\text{SMs} \times \text{cores/SM} \times 2_{\text{FMA}} \times \text{clock\_Hz}}{10^{12}}
+\]</div>
+<p>The <code>×2</code> factor accounts for fused multiply-add (each FMA = 2 FLOPs per clock).</p>
 <table>
 <thead>
 <tr>
-<th>GPU</th>
-<th style="text-align: center;">FP32 (TFLOPS)</th>
-<th style="text-align: center;">TF32 (TFLOPS)</th>
-<th style="text-align: center;">FP16/BF16 (TFLOPS)</th>
+<th style="text-align: center;">Compute Capability</th>
+<th>Architecture</th>
+<th style="text-align: center;">FP32 Cores / SM</th>
+<th>Example GPUs</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>A10G</strong></td>
-<td style="text-align: center;"><strong>31.2</strong></td>
-<td style="text-align: center;">62.5</td>
-<td style="text-align: center;">125.0</td>
+<td style="text-align: center;">7.0</td>
+<td>Volta</td>
+<td style="text-align: center;">64</td>
+<td>V100</td>
 </tr>
 <tr>
-<td>A100 SXM</td>
-<td style="text-align: center;">19.5</td>
-<td style="text-align: center;">156.0</td>
-<td style="text-align: center;">312.0</td>
+<td style="text-align: center;">7.5</td>
+<td>Turing</td>
+<td style="text-align: center;">64</td>
+<td>T4, RTX 2080</td>
 </tr>
 <tr>
-<td>H100 SXM</td>
-<td style="text-align: center;">66.9</td>
-<td style="text-align: center;">494.7</td>
-<td style="text-align: center;">989.4</td>
+<td style="text-align: center;">8.0</td>
+<td>Ampere</td>
+<td style="text-align: center;">64</td>
+<td>A100</td>
 </tr>
 <tr>
-<td>V100 SXM</td>
-<td style="text-align: center;">15.7</td>
-<td style="text-align: center;">15.7</td>
-<td style="text-align: center;">125.0</td>
+<td style="text-align: center;">8.6</td>
+<td>Ampere</td>
+<td style="text-align: center;">128</td>
+<td>A10G, RTX 3090</td>
 </tr>
 <tr>
-<td>T4</td>
-<td style="text-align: center;">8.1</td>
-<td style="text-align: center;">8.1</td>
-<td style="text-align: center;">65.0</td>
+<td style="text-align: center;">8.9</td>
+<td>Ada Lovelace</td>
+<td style="text-align: center;">128</td>
+<td>L4, L40, RTX 4090</td>
 </tr>
 <tr>
-<td>L4</td>
-<td style="text-align: center;">30.3</td>
-<td style="text-align: center;">120.0</td>
-<td style="text-align: center;">242.0</td>
-</tr>
-<tr>
-<td>L40S</td>
-<td style="text-align: center;">91.6</td>
-<td style="text-align: center;">183.0</td>
-<td style="text-align: center;">366.0</td>
+<td style="text-align: center;">9.0</td>
+<td>Hopper</td>
+<td style="text-align: center;">128</td>
+<td>H100</td>
 </tr>
 </tbody>
 </table>
-<p>The GPU name is auto-detected via <code>torch.cuda.get_device_name()</code>.
-The default precision ceiling is FP32.  Override with env var <code>PRECISION=tf32</code>
-or <code>PRECISION=fp16</code> to compare against Tensor Core peaks.</p>
-<div class="admonition note">
-<p class="admonition-title">Why A100 FP32 is lower than A10G</p>
-<p>The A100's 19.5 TFLOPS FP32 applies to its <em>non-Tensor-Core</em> FP32 path.
-In practice, most workloads use TF32 Tensor Cores (156 TFLOPS) via
-<code>torch.backends.cuda.matmul.allow_tf32 = True</code>.
-The A10G does not have a separate TF32 non-TC path, so its 31.2 TFLOPS
-figure already accounts for its smaller core count.</p>
+<p>For the A10G (CC 8.6, 80 SMs, 1710 MHz boost):</p>
+<div class="arithmatex">\[
+80 \times 128 \times 2 \times 1.710 \times 10^9 / 10^{12} = 35.0 \;\text{TFLOPS}
+\]</div>
+<h4 id="method-2-empirical-gemm-benchmark">Method 2 — Empirical GEMM benchmark</h4>
+<p>The theoretical number assumes every core is busy every cycle, which is never
+achievable in practice.  We measure the <strong>realistic peak</strong> by running a large
+matrix multiplication (4096 × 4096 FP32, 100 iterations after 20 warmup) that
+saturates the GPU's arithmetic units:</p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">empirical_peak_tflops</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">warmup</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">iters</span><span class="o">=</span><span class="mi">100</span><span class="p">):</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">2048</span><span class="p">,</span> <span class="mi">4096</span><span class="p">,</span> <span class="mi">8192</span><span class="p">):</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;cuda:</span><span class="si">{</span><span class="n">device</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;cuda:</span><span class="si">{</span><span class="n">device</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">tf32</span> <span class="ow">in</span> <span class="p">((</span><span class="s2">&quot;fp32&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;tf32&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)):</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">backends</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">matmul</span><span class="o">.</span><span class="n">allow_tf32</span> <span class="o">=</span> <span class="n">tf32</span>
+            <span class="c1"># ... warmup + timed loop ...</span>
+            <span class="n">tflops</span> <span class="o">=</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">n</span><span class="o">**</span><span class="mi">3</span> <span class="o">*</span> <span class="n">iters</span> <span class="o">/</span> <span class="n">elapsed</span><span class="p">)</span> <span class="o">/</span> <span class="mf">1e12</span>
+            <span class="n">results</span><span class="p">[</span><span class="n">label</span><span class="p">]</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">results</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">tflops</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">results</span>   <span class="c1"># {&quot;fp32&quot;: 23.5, &quot;tf32&quot;: 34.1}</span>
+</code></pre></div>
+<p>The function sweeps matrix sizes (2048, 4096, 8192) and tests with TF32
+tensor cores both enabled and disabled, returning both peaks.</p>
+<div class="admonition info">
+<p class="admonition-title">Results on A10G</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th style="text-align: center;">TFLOPS</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Theoretical (CUDA props)</td>
+<td style="text-align: center;">35.0</td>
+</tr>
+<tr>
+<td>Empirical FP32 (CUDA cores, TF32=off)</td>
+<td style="text-align: center;">23.5</td>
+</tr>
+<tr>
+<td>Empirical TF32 (Tensor Cores, TF32=on)</td>
+<td style="text-align: center;">34.1</td>
+</tr>
+<tr>
+<td>NVIDIA datasheet "FP32"</td>
+<td style="text-align: center;">31.2</td>
+</tr>
+</tbody>
+</table>
+<p>NVIDIA's datasheet "31.2 TFLOPS FP32" actually uses <strong>TF32 Tensor
+Cores</strong> — the inputs and outputs are float32, but the internal multiply
+accumulates at TF32 precision (10-bit mantissa).  With
+<code>torch.backends.cuda.matmul.allow_tf32 = False</code> (pure FP32 CUDA cores),
+throughput drops to ~23.5 TFLOPS.</p>
+<p>Since Enformer runs with <code>allow_tf32 = False</code> (the default in our
+script), we use the <strong>empirical FP32 peak (23.5 TFLOPS)</strong> as the
+FLOPS utilization ceiling — giving a more honest efficiency number.</p>
 </div>
 <h3 id="flops-utilization">FLOPS Utilization</h3>
 <p>For each sequence, we compute:</p>
@@ -1445,36 +1552,40 @@ per-run values).  This design:</p>
 </thead>
 <tbody>
 <tr>
-<td><strong>FLOPS Utilization</strong></td>
-<td>43.5% of 31.2 TFLOPS peak (range 43.2 – 43.7%)</td>
-</tr>
-<tr>
 <td><strong>Achieved TFLOPS</strong></td>
 <td>13.56 TFLOPS</td>
 </tr>
 <tr>
+<td><strong>FLOPS Util (vs empirical FP32 peak)</strong></td>
+<td>57.6% of 23.5 TFLOPS (min 57.4%, max 57.9%)</td>
+</tr>
+<tr>
+<td><strong>FLOPS Util (vs datasheet/TF32 peak)</strong></td>
+<td>~43.5% of 31.2 TFLOPS</td>
+</tr>
+<tr>
 <td><strong>NVML GPU Busy</strong></td>
-<td>98.3% ± 0.1%</td>
+<td>98.3% ± 0.1% (min 98%, max 98%)</td>
 </tr>
 <tr>
 <td><strong>Peak Memory</strong></td>
-<td>6,800 MB</td>
+<td>6,800 MB ± 0 MB</td>
 </tr>
 <tr>
 <td><strong>Power Draw</strong></td>
-<td>241.1 W ± 2.6 W (max 244 W)</td>
+<td>240.6 W ± 1.5 W (max 243 W)</td>
 </tr>
 <tr>
 <td><strong>Temperature</strong></td>
-<td>48.8°C ± 2.8°C (max 50°C)</td>
+<td>49.0°C ± 1.6°C (max 50°C)</td>
 </tr>
 <tr>
 <td><strong>Energy</strong></td>
-<td>58.55 J ± 0.69 J per inference</td>
+<td>58.44 J ± 0.36 J per inference</td>
 </tr>
 <tr>
 <td><strong>Inference Time</strong></td>
-<td>0.243 s ± 0.0004 s per sequence</td>
+<td>0.243 s ± 0.000 s per sequence</td>
 </tr>
 <tr>
 <td><strong>Repeat σ (time)</strong></td>
@@ -1486,11 +1597,17 @@ per-run values).  This design:</p>
 </tr>
 </tbody>
 </table>
-<p><strong>Key insight:</strong> While NVML reports 98% GPU busy, the actual FLOPS utilization
-is only <strong>43.5%</strong> — meaning more than half the chip's FP32 compute capacity
-sits idle during each forward pass.  This gap is typical for Transformer models
-with attention memory-access patterns that are bandwidth- rather than
-compute-bound.</p>
+<p><strong>Key insight:</strong> The achieved throughput is a constant <strong>13.56 TFLOPS</strong>.
+Whether that looks like "43.5% efficient" or "57.6% efficient" depends entirely
+on which ceiling you compare against:</p>
+<ul>
+<li><strong>vs NVIDIA datasheet (31.2 TFLOPS):</strong> 43.5% — but this ceiling uses TF32
+  Tensor Cores internally, which Enformer doesn't leverage.</li>
+<li><strong>vs empirical FP32 CUDA-core peak (23.5 TFLOPS):</strong> 57.6% — a fairer
+  comparison when the model runs in pure FP32.</li>
+</ul>
+<p>Either way, NVML reports 98% "busy" — illustrating that kernel occupancy and
+compute efficiency are fundamentally different metrics.</p>
 <hr />
 <h3 id="gpu-dashboard">GPU Dashboard</h3>
 <p>The 2×3 dashboard provides an at-a-glance view of all six key metrics across
@@ -1499,9 +1616,10 @@ all 100 sequences:</p>
 <hr />
 <h3 id="flops-utilization-per-sequence">FLOPS Utilization per Sequence</h3>
 <p><img alt="FLOPS Utilization" src="../img/flops_utilization_per_seq.png" /></p>
-<p>FLOPS utilization is remarkably stable at ~43.5%, with a spread of only 0.5
-percentage points across 100 sequences.  This confirms that Enformer's FP32
-forward pass consistently achieves about 13.6 TFLOPS on the A10G.</p>
+<p>FLOPS utilization is remarkably stable at 57.6%, with a spread of only 0.5
+percentage points across 100 sequences (min 57.4%, max 57.9%).  This confirms
+that Enformer's FP32 forward pass consistently achieves about 13.56 TFLOPS on
+the A10G.</p>
 <hr />
 <h3 id="nvml-gpu-busy-per-sequence">NVML GPU Busy per Sequence</h3>
 <p><img alt="GPU Busy" src="../img/gpu_busy_per_seq.png" /></p>
@@ -1512,8 +1630,8 @@ between workloads.</p>
 <h3 id="flops-utilization-vs-nvml-busy">FLOPS Utilization vs NVML Busy</h3>
 <p><img alt="FLOPS vs NVML" src="../img/flops_vs_nvml.png" /></p>
 <p>The scatter plot (left) and comparison bars (right) make the discrepancy
-concrete:  NVML says "98% busy" while true compute efficiency is only "43.5%
-of peak FP32."</p>
+concrete:  NVML says "98% busy" while true compute efficiency is only 57.6%
+of the empirical FP32 peak (or 43.5% of the datasheet number).</p>
 <hr />
 <h3 id="peak-memory-per-sequence">Peak Memory per Sequence</h3>
 <p><img alt="Memory" src="../img/gpu_memory_per_seq.png" /></p>
@@ -1522,13 +1640,13 @@ first forward pass and reuses the same memory pool thereafter.</p>
 <hr />
 <h3 id="power-draw-per-sequence">Power Draw per Sequence</h3>
 <p><img alt="Power" src="../img/gpu_power_per_seq.png" /></p>
-<p>Power draw ramps to ~241 W (the A10G TDP is 300 W) with a slight upward trend
-as the GPU die temperature increases.</p>
+<p>Power draw ramps to ~241 W (the A10G TDP is 300 W, max observed 243 W) with a
+slight upward trend as the GPU die temperature increases.</p>
 <hr />
 <h3 id="temperature-per-sequence">Temperature per Sequence</h3>
 <p><img alt="Temperature" src="../img/gpu_temperature_per_seq.png" /></p>
-<p>Temperature rises from ~44°C to ~50°C across the 100 sequences as the thermal
-load accumulates, then plateaus.</p>
+<p>Temperature rises from ~47°C to ~50°C across the 100 sequences as the thermal
+load accumulates, then plateaus (mean 49.0°C ± 1.6°C).</p>
 <hr />
 <h3 id="inference-time-distribution">Inference Time Distribution</h3>
 <p><img alt="Inference Time" src="../img/inference_time.png" /></p>
