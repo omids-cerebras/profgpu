@@ -1,7 +1,7 @@
 site_name: profgpu
 site_description: Programmatic GPU utilization profiling (decorator + context manager + CLI)
-repo_url: https://github.com/<you>/profgpu
-repo_name: <you>/profgpu
+repo_url: https://github.com/omids-cerebras/profgpu
+repo_name: omids-cerebras/profgpu
 
 theme:
   name: material
@@ -17,6 +17,13 @@ markdown_extensions:
   - pymdownx.superfences
   - pymdownx.highlight
   - pymdownx.inlinehilite
+  - pymdownx.arithmatex:
+      generic: true
+  - attr_list
+  - md_in_html
+
+extra_javascript:
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
 
 nav:
   - Home: index.md
@@ -27,6 +34,8 @@ nav:
       - PyTorch: tutorials/pytorch.md
       - CLI: tutorials/cli.md
       - Logging & Export: tutorials/logging.md
+  - Reports:
+      - Enformer GPU Profiling: reports/enformer_gpu_profiling.md
   - Notebooks: notebooks.md
   - API Reference: api.md
   - Troubleshooting: troubleshooting.md

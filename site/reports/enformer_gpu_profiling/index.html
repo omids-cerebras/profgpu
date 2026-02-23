@@ -1,0 +1,1741 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+
+        <meta name="description" content="Programmatic GPU utilization profiling (decorator + context manager + CLI)">
+
+
+
+
+        <link rel="prev" href="../../tutorials/logging/">
+
+
+        <link rel="next" href="../../notebooks/">
+
+
+
+
+
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.2">
+
+
+
+        <title>Enformer GPU Profiling - profgpu</title>
+
+
+
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+
+
+
+
+
+
+
+
+
+
+
+
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+
+
+
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+
+
+
+
+
+  </head>
+
+
+    <body dir="ltr">
+
+
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+
+
+        <a href="#enformer-gpu-profiling-report" class="md-skip">
+          Skip to content
+        </a>
+
+    </div>
+    <div data-md-component="announce">
+
+    </div>
+
+
+
+
+
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="profgpu" class="md-header__button md-logo" aria-label="profgpu" data-md-component="logo">
+
+
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            profgpu
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+
+              Enformer GPU Profiling
+
+          </span>
+        </div>
+      </div>
+    </div>
+
+
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+
+
+
+
+
+        <label class="md-header__button md-icon" for="__search">
+
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+      <div class="md-header__source">
+        <a href="https://github.com/<you>/profgpu" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    <you>/profgpu
+  </div>
+</a>
+      </div>
+
+  </nav>
+
+</header>
+
+    <div class="md-container" data-md-component="container">
+
+
+
+
+
+
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+
+
+
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="profgpu" class="md-nav__button md-logo" aria-label="profgpu" data-md-component="logo">
+
+
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    profgpu
+  </label>
+
+    <div class="md-nav__source">
+      <a href="https://github.com/<you>/profgpu" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    <you>/profgpu
+  </div>
+</a>
+    </div>
+
+  <ul class="md-nav__list" data-md-scrollfix>
+
+
+
+
+
+
+
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+
+
+
+  <span class="md-ellipsis">
+
+
+    Home
+
+
+
+  </span>
+
+
+
+      </a>
+    </li>
+
+
+
+
+
+
+
+
+
+    <li class="md-nav__item">
+      <a href="../../installation/" class="md-nav__link">
+
+
+
+  <span class="md-ellipsis">
+
+
+    Installation
+
+
+
+  </span>
+
+
+
+      </a>
+    </li>
+
+
+
+
+
+
+
+
+
+    <li class="md-nav__item">
+      <a href="../../quickstart/" class="md-nav__link">
+
+
+
+  <span class="md-ellipsis">
+
+
+    Quickstart
+
+
+
+  </span>
+
+
+
+      </a>
+    </li>
+
+
+
+
+
+
+
+
+
+    <li class="md-nav__item">
+      <a href="../../concepts/" class="md-nav__link">
+
+
+
+  <span class="md-ellipsis">
+
+
+    Concepts
+
+
+
+  </span>
+
+
+
+      </a>
+    </li>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+
+
+
+
+
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+
+
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+
+
+
+  <span class="md-ellipsis">
+
+
+    Tutorials
+
+
+
+  </span>
+
+
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+
+
+    Tutorials
+
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+
+
+
+
+
+
+
+    <li class="md-nav__item">
+      <a href="../../tutorials/pytorch/" class="md-nav__link">
+
+
+
+  <span class="md-ellipsis">
+
+
+    PyTorch
+
+
+
+  </span>
+
+
+
+      </a>
+    </li>
+
+
+
+
+
+
+
+
+
+
+    <li class="md-nav__item">
+      <a href="../../tutorials/cli/" class="md-nav__link">
+
+
+
+  <span class="md-ellipsis">
+
+
+    CLI
+
+
+
+  </span>
+
+
+
+      </a>
+    </li>
+
+
+
+
+
+
+
+
+
+
+    <li class="md-nav__item">
+      <a href="../../tutorials/logging/" class="md-nav__link">
+
+
+
+  <span class="md-ellipsis">
+
+
+    Logging & Export
+
+
+
+  </span>
+
+
+
+      </a>
+    </li>
+
+
+
+
+          </ul>
+        </nav>
+
+    </li>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+
+
+
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+
+
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+
+
+
+  <span class="md-ellipsis">
+
+
+    Reports
+
+
+
+  </span>
+
+
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+
+
+    Reports
+
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+
+
+
+
+
+
+
+
+
+    <li class="md-nav__item md-nav__item--active">
+
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+
+
+
+
+
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+
+
+
+  <span class="md-ellipsis">
+
+
+    Enformer GPU Profiling
+
+
+
+  </span>
+
+
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+
+      <a href="./" class="md-nav__link md-nav__link--active">
+
+
+
+  <span class="md-ellipsis">
+
+
+    Enformer GPU Profiling
+
+
+
+  </span>
+
+
+
+      </a>
+
+
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+
+
+
+
+
+
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+
+        <li class="md-nav__item">
+  <a href="#experiment-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Experiment Setup
+
+    </span>
+  </a>
+
+    <nav class="md-nav" aria-label="Experiment Setup">
+      <ul class="md-nav__list">
+
+          <li class="md-nav__item">
+  <a href="#about-the-model" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        About the Model
+
+    </span>
+  </a>
+
+</li>
+
+      </ul>
+    </nav>
+
+</li>
+
+        <li class="md-nav__item">
+  <a href="#how-metrics-are-computed" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        How Metrics Are Computed
+
+    </span>
+  </a>
+
+    <nav class="md-nav" aria-label="How Metrics Are Computed">
+      <ul class="md-nav__list">
+
+          <li class="md-nav__item">
+  <a href="#flop-counting" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        FLOP Counting
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#peak-hardware-tflops" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Peak Hardware TFLOPS
+
+    </span>
+  </a>
+
+    <nav class="md-nav" aria-label="Peak Hardware TFLOPS">
+      <ul class="md-nav__list">
+
+          <li class="md-nav__item">
+  <a href="#method-1-theoretical-from-cuda-device-properties" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Method 1 — Theoretical (from CUDA device properties)
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#method-2-empirical-gemm-benchmark" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Method 2 — Empirical GEMM benchmark
+
+    </span>
+  </a>
+
+</li>
+
+      </ul>
+    </nav>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#flops-utilization" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        FLOPS Utilization
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#nvml-gpu-busy" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        NVML GPU Busy (%)
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#profiling-with-profile_repeats" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Profiling with profile_repeats
+
+    </span>
+  </a>
+
+</li>
+
+      </ul>
+    </nav>
+
+</li>
+
+        <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Results
+
+    </span>
+  </a>
+
+    <nav class="md-nav" aria-label="Results">
+      <ul class="md-nav__list">
+
+          <li class="md-nav__item">
+  <a href="#aggregate-statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Aggregate Statistics
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#gpu-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        GPU Dashboard
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#flops-utilization-per-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        FLOPS Utilization per Sequence
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#nvml-gpu-busy-per-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        NVML GPU Busy per Sequence
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#flops-utilization-vs-nvml-busy" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        FLOPS Utilization vs NVML Busy
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#peak-memory-per-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Peak Memory per Sequence
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#power-draw-per-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Power Draw per Sequence
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#temperature-per-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Temperature per Sequence
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#inference-time-distribution" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Inference Time Distribution
+
+    </span>
+  </a>
+
+</li>
+
+      </ul>
+    </nav>
+
+</li>
+
+        <li class="md-nav__item">
+  <a href="#reproducing-this-report" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Reproducing This Report
+
+    </span>
+  </a>
+
+</li>
+
+        <li class="md-nav__item">
+  <a href="#source-code" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Source Code
+
+    </span>
+  </a>
+
+</li>
+
+    </ul>
+
+</nav>
+
+    </li>
+
+
+
+
+          </ul>
+        </nav>
+
+    </li>
+
+
+
+
+
+
+
+
+
+    <li class="md-nav__item">
+      <a href="../../notebooks/" class="md-nav__link">
+
+
+
+  <span class="md-ellipsis">
+
+
+    Notebooks
+
+
+
+  </span>
+
+
+
+      </a>
+    </li>
+
+
+
+
+
+
+
+
+
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+
+
+
+  <span class="md-ellipsis">
+
+
+    API Reference
+
+
+
+  </span>
+
+
+
+      </a>
+    </li>
+
+
+
+
+
+
+
+
+
+    <li class="md-nav__item">
+      <a href="../../troubleshooting/" class="md-nav__link">
+
+
+
+  <span class="md-ellipsis">
+
+
+    Troubleshooting
+
+
+
+  </span>
+
+
+
+      </a>
+    </li>
+
+
+
+
+
+
+
+
+
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+
+
+
+  <span class="md-ellipsis">
+
+
+    FAQ
+
+
+
+  </span>
+
+
+
+      </a>
+    </li>
+
+
+
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+
+
+
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+
+
+
+
+
+
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+
+        <li class="md-nav__item">
+  <a href="#experiment-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Experiment Setup
+
+    </span>
+  </a>
+
+    <nav class="md-nav" aria-label="Experiment Setup">
+      <ul class="md-nav__list">
+
+          <li class="md-nav__item">
+  <a href="#about-the-model" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        About the Model
+
+    </span>
+  </a>
+
+</li>
+
+      </ul>
+    </nav>
+
+</li>
+
+        <li class="md-nav__item">
+  <a href="#how-metrics-are-computed" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        How Metrics Are Computed
+
+    </span>
+  </a>
+
+    <nav class="md-nav" aria-label="How Metrics Are Computed">
+      <ul class="md-nav__list">
+
+          <li class="md-nav__item">
+  <a href="#flop-counting" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        FLOP Counting
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#peak-hardware-tflops" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Peak Hardware TFLOPS
+
+    </span>
+  </a>
+
+    <nav class="md-nav" aria-label="Peak Hardware TFLOPS">
+      <ul class="md-nav__list">
+
+          <li class="md-nav__item">
+  <a href="#method-1-theoretical-from-cuda-device-properties" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Method 1 — Theoretical (from CUDA device properties)
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#method-2-empirical-gemm-benchmark" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Method 2 — Empirical GEMM benchmark
+
+    </span>
+  </a>
+
+</li>
+
+      </ul>
+    </nav>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#flops-utilization" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        FLOPS Utilization
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#nvml-gpu-busy" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        NVML GPU Busy (%)
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#profiling-with-profile_repeats" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Profiling with profile_repeats
+
+    </span>
+  </a>
+
+</li>
+
+      </ul>
+    </nav>
+
+</li>
+
+        <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Results
+
+    </span>
+  </a>
+
+    <nav class="md-nav" aria-label="Results">
+      <ul class="md-nav__list">
+
+          <li class="md-nav__item">
+  <a href="#aggregate-statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Aggregate Statistics
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#gpu-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        GPU Dashboard
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#flops-utilization-per-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        FLOPS Utilization per Sequence
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#nvml-gpu-busy-per-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        NVML GPU Busy per Sequence
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#flops-utilization-vs-nvml-busy" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        FLOPS Utilization vs NVML Busy
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#peak-memory-per-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Peak Memory per Sequence
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#power-draw-per-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Power Draw per Sequence
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#temperature-per-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Temperature per Sequence
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#inference-time-distribution" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Inference Time Distribution
+
+    </span>
+  </a>
+
+</li>
+
+      </ul>
+    </nav>
+
+</li>
+
+        <li class="md-nav__item">
+  <a href="#reproducing-this-report" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Reproducing This Report
+
+    </span>
+  </a>
+
+</li>
+
+        <li class="md-nav__item">
+  <a href="#source-code" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Source Code
+
+    </span>
+  </a>
+
+</li>
+
+    </ul>
+
+</nav>
+                  </div>
+                </div>
+              </div>
+
+
+
+            <div class="md-content" data-md-component="content">
+
+              <article class="md-content__inner md-typeset">
+
+
+
+
+
+
+
+
+<h1 id="enformer-gpu-profiling-report">Enformer GPU Profiling Report</h1>
+<p>This report presents a comprehensive GPU profiling analysis of
+<a href="https://www.nature.com/articles/s41592-021-01252-x">Enformer</a> inference
+using <strong>profgpu</strong>.  The goal is to demonstrate how profgpu's <code>profile_repeats</code>
+API can characterize GPU behaviour beyond the coarse "GPU busy %" that NVML
+reports, including true <strong>FLOPS utilization</strong> as a percentage of peak hardware
+throughput.</p>
+<hr />
+<h2 id="experiment-setup">Experiment Setup</h2>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Model</strong></td>
+<td>Enformer (<code>enformer-pytorch 0.8.11</code>)</td>
+</tr>
+<tr>
+<td><strong>Weights</strong></td>
+<td><code>EleutherAI/enformer-official-rough</code> (HuggingFace)</td>
+</tr>
+<tr>
+<td><strong>Parameters</strong></td>
+<td>251,221,292 (~251 M)</td>
+</tr>
+<tr>
+<td><strong>Input</strong></td>
+<td>Random one-hot DNA sequences, 196,608 bp × 4 bases</td>
+</tr>
+<tr>
+<td><strong>Batch size</strong></td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>Sequences</strong></td>
+<td>100</td>
+</tr>
+<tr>
+<td><strong>Repeats / sequence</strong></td>
+<td>10 (with 1 warmup run excluded)</td>
+</tr>
+<tr>
+<td><strong>Total forward passes</strong></td>
+<td>1,000</td>
+</tr>
+<tr>
+<td><strong>Precision</strong></td>
+<td>FP32 (PyTorch default)</td>
+</tr>
+<tr>
+<td><strong>GPU</strong></td>
+<td>NVIDIA A10G (Ampere, 24 GB GDDR6X)</td>
+</tr>
+<tr>
+<td><strong>Driver / CUDA</strong></td>
+<td>CUDA 12.4, PyTorch 2.6.0</td>
+</tr>
+<tr>
+<td><strong>Profiling tool</strong></td>
+<td>profgpu <code>profile_repeats()</code> with NVML backend, 50 ms polling</td>
+</tr>
+</tbody>
+</table>
+<h3 id="about-the-model">About the Model</h3>
+<p>Enformer is a deep-learning model for predicting gene expression and chromatin
+states from DNA sequence.  It uses a convolutional stem followed by 11
+Transformer blocks operating over a 196,608 bp input window and produces 5,313
+human and 1,643 mouse genomic tracks.</p>
+<p>The model was published by DeepMind (Avsec et al., <em>Nature Methods</em> 2021) and
+reimplemented in PyTorch by <a href="https://github.com/lucidrains/enformer-pytorch">lucidrains</a>.</p>
+<hr />
+<h2 id="how-metrics-are-computed">How Metrics Are Computed</h2>
+<h3 id="flop-counting">FLOP Counting</h3>
+<p>We use <strong><code>torch.utils.flop_counter.FlopCounterMode</code></strong> to count the exact
+number of floating-point operations in a single forward pass.  This context
+manager hooks into every ATen operator and tallies FLOPs analytically (e.g.
+matrix multiplications, convolutions, reductions).  For Enformer:</p>
+<div class="arithmatex">\[
+\text{FLOPs per forward pass} = 3{,}293{,}120{,}495{,}616 \approx 3.29 \;\text{TFLOP}
+\]</div>
+<p>This is more accurate than estimation heuristics (e.g. <code>2 × MACs</code>) because it
+counts every operator, not just matmuls.</p>
+<h3 id="peak-hardware-tflops">Peak Hardware TFLOPS</h3>
+<p>Rather than relying on a hardcoded lookup table of datasheet values, we
+<strong>estimate peak TFLOPS programmatically</strong> using two complementary methods:</p>
+<h4 id="method-1-theoretical-from-cuda-device-properties">Method 1 — Theoretical (from CUDA device properties)</h4>
+<p>Every CUDA device exposes its SM count, compute capability, and boost clock
+via <code>torch.cuda.get_device_properties()</code>.  Combined with a small table mapping
+compute capability → FP32 cores per SM, we compute:</p>
+<div class="arithmatex">\[
+\text{Theoretical Peak} = \frac{\text{SMs} \times \text{cores/SM} \times 2_{\text{FMA}} \times \text{clock\_Hz}}{10^{12}}
+\]</div>
+<p>The <code>×2</code> factor accounts for fused multiply-add (each FMA = 2 FLOPs per clock).</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Compute Capability</th>
+<th>Architecture</th>
+<th style="text-align: center;">FP32 Cores / SM</th>
+<th>Example GPUs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">7.0</td>
+<td>Volta</td>
+<td style="text-align: center;">64</td>
+<td>V100</td>
+</tr>
+<tr>
+<td style="text-align: center;">7.5</td>
+<td>Turing</td>
+<td style="text-align: center;">64</td>
+<td>T4, RTX 2080</td>
+</tr>
+<tr>
+<td style="text-align: center;">8.0</td>
+<td>Ampere</td>
+<td style="text-align: center;">64</td>
+<td>A100</td>
+</tr>
+<tr>
+<td style="text-align: center;">8.6</td>
+<td>Ampere</td>
+<td style="text-align: center;">128</td>
+<td>A10G, RTX 3090</td>
+</tr>
+<tr>
+<td style="text-align: center;">8.9</td>
+<td>Ada Lovelace</td>
+<td style="text-align: center;">128</td>
+<td>L4, L40, RTX 4090</td>
+</tr>
+<tr>
+<td style="text-align: center;">9.0</td>
+<td>Hopper</td>
+<td style="text-align: center;">128</td>
+<td>H100</td>
+</tr>
+</tbody>
+</table>
+<p>For the A10G (CC 8.6, 80 SMs, 1710 MHz boost):</p>
+<div class="arithmatex">\[
+80 \times 128 \times 2 \times 1.710 \times 10^9 / 10^{12} = 35.0 \;\text{TFLOPS}
+\]</div>
+<h4 id="method-2-empirical-gemm-benchmark">Method 2 — Empirical GEMM benchmark</h4>
+<p>The theoretical number assumes every core is busy every cycle, which is never
+achievable in practice.  We measure the <strong>realistic peak</strong> by running a large
+matrix multiplication (4096 × 4096 FP32, 100 iterations after 20 warmup) that
+saturates the GPU's arithmetic units:</p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">empirical_peak_tflops</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">warmup</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">iters</span><span class="o">=</span><span class="mi">100</span><span class="p">):</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">2048</span><span class="p">,</span> <span class="mi">4096</span><span class="p">,</span> <span class="mi">8192</span><span class="p">):</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;cuda:</span><span class="si">{</span><span class="n">device</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;cuda:</span><span class="si">{</span><span class="n">device</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">tf32</span> <span class="ow">in</span> <span class="p">((</span><span class="s2">&quot;fp32&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;tf32&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)):</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">backends</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">matmul</span><span class="o">.</span><span class="n">allow_tf32</span> <span class="o">=</span> <span class="n">tf32</span>
+            <span class="c1"># ... warmup + timed loop ...</span>
+            <span class="n">tflops</span> <span class="o">=</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">n</span><span class="o">**</span><span class="mi">3</span> <span class="o">*</span> <span class="n">iters</span> <span class="o">/</span> <span class="n">elapsed</span><span class="p">)</span> <span class="o">/</span> <span class="mf">1e12</span>
+            <span class="n">results</span><span class="p">[</span><span class="n">label</span><span class="p">]</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">results</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">tflops</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">results</span>   <span class="c1"># {&quot;fp32&quot;: 23.5, &quot;tf32&quot;: 34.1}</span>
+</code></pre></div>
+<p>The function sweeps matrix sizes (2048, 4096, 8192) and tests with TF32
+tensor cores both enabled and disabled, returning both peaks.</p>
+<div class="admonition info">
+<p class="admonition-title">Results on A10G</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th style="text-align: center;">TFLOPS</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Theoretical (CUDA props)</td>
+<td style="text-align: center;">35.0</td>
+</tr>
+<tr>
+<td>Empirical FP32 (CUDA cores, TF32=off)</td>
+<td style="text-align: center;">23.5</td>
+</tr>
+<tr>
+<td>Empirical TF32 (Tensor Cores, TF32=on)</td>
+<td style="text-align: center;">34.1</td>
+</tr>
+<tr>
+<td>NVIDIA datasheet "FP32"</td>
+<td style="text-align: center;">31.2</td>
+</tr>
+</tbody>
+</table>
+<p>NVIDIA's datasheet "31.2 TFLOPS FP32" actually uses <strong>TF32 Tensor
+Cores</strong> — the inputs and outputs are float32, but the internal multiply
+accumulates at TF32 precision (10-bit mantissa).  With
+<code>torch.backends.cuda.matmul.allow_tf32 = False</code> (pure FP32 CUDA cores),
+throughput drops to ~23.5 TFLOPS.</p>
+<p>Since Enformer runs with <code>allow_tf32 = False</code> (the default in our
+script), we use the <strong>empirical FP32 peak (23.5 TFLOPS)</strong> as the
+FLOPS utilization ceiling — giving a more honest efficiency number.</p>
+</div>
+<h3 id="flops-utilization">FLOPS Utilization</h3>
+<p>For each sequence, we compute:</p>
+<div class="arithmatex">\[
+\text{Achieved TFLOPS} = \frac{\text{FLOPs per pass}}{\text{wall-clock time (s)}} \times 10^{-12}
+\]</div>
+<div class="arithmatex">\[
+\text{FLOPS Utilization (\%)} = \frac{\text{Achieved TFLOPS}}{\text{Peak TFLOPS}} \times 100
+\]</div>
+<p>This gives a <strong>true compute-efficiency metric</strong> — what fraction of the GPU's
+theoretical maximum throughput your workload actually uses.</p>
+<h3 id="nvml-gpu-busy">NVML GPU Busy (%)</h3>
+<p>This is the metric reported by <code>nvidia-smi</code> and the NVML API
+(<code>nvmlDeviceGetUtilizationRates</code>).  It measures the fraction of time <em>at least
+one GPU kernel was running</em> during the driver's ~1-second sampling window.  A
+value of 98% means the GPU was "doing something" 98% of the time — but says
+nothing about <em>how efficiently</em> the hardware is used.</p>
+<div class="admonition warning">
+<p class="admonition-title">NVML busy ≠ compute efficiency</p>
+<p>A kernel that reads one byte from global memory still registers as 100%
+utilization for that sampling window.  FLOPS utilization is the metric
+that actually captures how much of the chip's arithmetic capacity is used.</p>
+</div>
+<h3 id="profiling-with-profile_repeats">Profiling with <code>profile_repeats</code></h3>
+<p>Each of the 100 sequences is profiled with <strong>10 independent repeats</strong> (plus 1
+warmup run that is excluded from statistics).  <code>profile_repeats</code> returns a
+<code>MultiRunResult</code> containing <code>RunStats</code> for every metric (mean, std, min, max,
+per-run values).  This design:</p>
+<ul>
+<li>Absorbs run-to-run jitter from GPU clock boosting, host scheduling, and
+  memory allocator warm-up.</li>
+<li>Provides standard deviations and confidence intervals.</li>
+<li>Lets you distinguish systematic sequence-level variation from random noise.</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">profgpu</span><span class="w"> </span><span class="kn">import</span> <span class="n">profile_repeats</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">profile_repeats</span><span class="p">(</span>
+    <span class="n">run_inference</span><span class="p">,</span>
+    <span class="n">repeats</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+    <span class="n">warmup_runs</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">device</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+    <span class="n">interval_s</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>       <span class="c1"># 50 ms NVML polling</span>
+    <span class="n">sync_fn</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">synchronize</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="c1"># result.util_gpu.mean, result.duration.std, etc.</span>
+</code></pre></div>
+<hr />
+<h2 id="results">Results</h2>
+<h3 id="aggregate-statistics">Aggregate Statistics</h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Achieved TFLOPS</strong></td>
+<td>13.56 TFLOPS</td>
+</tr>
+<tr>
+<td><strong>FLOPS Util (vs empirical FP32 peak)</strong></td>
+<td>57.6% of 23.5 TFLOPS (min 57.4%, max 57.9%)</td>
+</tr>
+<tr>
+<td><strong>FLOPS Util (vs datasheet/TF32 peak)</strong></td>
+<td>~43.5% of 31.2 TFLOPS</td>
+</tr>
+<tr>
+<td><strong>NVML GPU Busy</strong></td>
+<td>98.3% ± 0.1% (min 98%, max 98%)</td>
+</tr>
+<tr>
+<td><strong>Peak Memory</strong></td>
+<td>6,800 MB ± 0 MB</td>
+</tr>
+<tr>
+<td><strong>Power Draw</strong></td>
+<td>240.6 W ± 1.5 W (max 243 W)</td>
+</tr>
+<tr>
+<td><strong>Temperature</strong></td>
+<td>49.0°C ± 1.6°C (max 50°C)</td>
+</tr>
+<tr>
+<td><strong>Energy</strong></td>
+<td>58.44 J ± 0.36 J per inference</td>
+</tr>
+<tr>
+<td><strong>Inference Time</strong></td>
+<td>0.243 s ± 0.000 s per sequence</td>
+</tr>
+<tr>
+<td><strong>Repeat σ (time)</strong></td>
+<td>0.0008 s (extremely low run-to-run variance)</td>
+</tr>
+<tr>
+<td><strong>Total Inferences</strong></td>
+<td>1,000</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key insight:</strong> The achieved throughput is a constant <strong>13.56 TFLOPS</strong>.
+Whether that looks like "43.5% efficient" or "57.6% efficient" depends entirely
+on which ceiling you compare against:</p>
+<ul>
+<li><strong>vs NVIDIA datasheet (31.2 TFLOPS):</strong> 43.5% — but this ceiling uses TF32
+  Tensor Cores internally, which Enformer doesn't leverage.</li>
+<li><strong>vs empirical FP32 CUDA-core peak (23.5 TFLOPS):</strong> 57.6% — a fairer
+  comparison when the model runs in pure FP32.</li>
+</ul>
+<p>Either way, NVML reports 98% "busy" — illustrating that kernel occupancy and
+compute efficiency are fundamentally different metrics.</p>
+<hr />
+<h3 id="gpu-dashboard">GPU Dashboard</h3>
+<p>The 2×3 dashboard provides an at-a-glance view of all six key metrics across
+all 100 sequences:</p>
+<p><img alt="GPU Dashboard" src="../img/gpu_dashboard.png" /></p>
+<hr />
+<h3 id="flops-utilization-per-sequence">FLOPS Utilization per Sequence</h3>
+<p><img alt="FLOPS Utilization" src="../img/flops_utilization_per_seq.png" /></p>
+<p>FLOPS utilization is remarkably stable at 57.6%, with a spread of only 0.5
+percentage points across 100 sequences (min 57.4%, max 57.9%).  This confirms
+that Enformer's FP32 forward pass consistently achieves about 13.56 TFLOPS on
+the A10G.</p>
+<hr />
+<h3 id="nvml-gpu-busy-per-sequence">NVML GPU Busy per Sequence</h3>
+<p><img alt="GPU Busy" src="../img/gpu_busy_per_seq.png" /></p>
+<p>NVML reports near-ceiling 98% utilization with negligible run-to-run standard
+deviation.  This metric is maximally saturated and provides no differentiation
+between workloads.</p>
+<hr />
+<h3 id="flops-utilization-vs-nvml-busy">FLOPS Utilization vs NVML Busy</h3>
+<p><img alt="FLOPS vs NVML" src="../img/flops_vs_nvml.png" /></p>
+<p>The scatter plot (left) and comparison bars (right) make the discrepancy
+concrete:  NVML says "98% busy" while true compute efficiency is only 57.6%
+of the empirical FP32 peak (or 43.5% of the datasheet number).</p>
+<hr />
+<h3 id="peak-memory-per-sequence">Peak Memory per Sequence</h3>
+<p><img alt="Memory" src="../img/gpu_memory_per_seq.png" /></p>
+<p>GPU memory usage is constant at 6,800 MB — Enformer allocates once during the
+first forward pass and reuses the same memory pool thereafter.</p>
+<hr />
+<h3 id="power-draw-per-sequence">Power Draw per Sequence</h3>
+<p><img alt="Power" src="../img/gpu_power_per_seq.png" /></p>
+<p>Power draw ramps to ~241 W (the A10G TDP is 300 W, max observed 243 W) with a
+slight upward trend as the GPU die temperature increases.</p>
+<hr />
+<h3 id="temperature-per-sequence">Temperature per Sequence</h3>
+<p><img alt="Temperature" src="../img/gpu_temperature_per_seq.png" /></p>
+<p>Temperature rises from ~47°C to ~50°C across the 100 sequences as the thermal
+load accumulates, then plateaus (mean 49.0°C ± 1.6°C).</p>
+<hr />
+<h3 id="inference-time-distribution">Inference Time Distribution</h3>
+<p><img alt="Inference Time" src="../img/inference_time.png" /></p>
+<p>The left panel shows per-sequence timing with ±1σ error bars from 10 repeats;
+the right panel shows the histogram with KDE overlay.  The distribution is
+extremely tight around 0.243 s with sub-millisecond variance.</p>
+<hr />
+<h2 id="reproducing-this-report">Reproducing This Report</h2>
+<div class="highlight"><pre><span></span><code><span class="c1"># Create and activate the environment</span>
+conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>profgpu<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.11<span class="w"> </span>-y
+conda<span class="w"> </span>activate<span class="w"> </span>profgpu
+
+<span class="c1"># Install dependencies</span>
+pip<span class="w"> </span>install<span class="w"> </span>profgpu<span class="o">[</span>nvml<span class="o">]</span><span class="w"> </span>enformer-pytorch<span class="w"> </span><span class="s1">&#39;transformers&lt;5&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>torch<span class="w"> </span>seaborn<span class="w"> </span>matplotlib<span class="w"> </span>numpy
+
+<span class="c1"># Run the profiling script (default: FP32 precision ceiling)</span>
+python<span class="w"> </span>examples/enformer_eval_gpu.py
+
+<span class="c1"># Or compare against TF32 peak</span>
+<span class="nv">PRECISION</span><span class="o">=</span>tf32<span class="w"> </span>python<span class="w"> </span>examples/enformer_eval_gpu.py
+</code></pre></div>
+<p>Output figures are saved to <code>examples/enformer_gpu_results/</code>.</p>
+<hr />
+<h2 id="source-code">Source Code</h2>
+<p>The full script is at
+<a href="https://github.com/omids-cerebras/profgpu/blob/main/examples/enformer_eval_gpu.py"><code>examples/enformer_eval_gpu.py</code></a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+              </article>
+            </div>
+
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+
+      </main>
+
+        <footer class="md-footer">
+
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+
+
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+
+</div>
+
+    </div>
+  </div>
+</footer>
+
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+
+
+
+
+
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+
+
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+
+  </body>
+</html>

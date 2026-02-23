@@ -1,0 +1,1502 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+
+        <meta name="description" content="Programmatic GPU utilization profiling (decorator + context manager + CLI)">
+
+
+
+
+        <link rel="prev" href="../quickstart/">
+
+
+        <link rel="next" href="../tutorials/pytorch/">
+
+
+
+
+
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.2">
+
+
+
+        <title>Concepts - profgpu</title>
+
+
+
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+
+
+
+
+
+
+
+
+
+
+
+
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+
+
+
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+
+
+
+
+
+  </head>
+
+
+    <body dir="ltr">
+
+
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+
+
+        <a href="#concepts" class="md-skip">
+          Skip to content
+        </a>
+
+    </div>
+    <div data-md-component="announce">
+
+    </div>
+
+
+
+
+
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="profgpu" class="md-header__button md-logo" aria-label="profgpu" data-md-component="logo">
+
+
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            profgpu
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+
+              Concepts
+
+          </span>
+        </div>
+      </div>
+    </div>
+
+
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+
+
+
+
+
+        <label class="md-header__button md-icon" for="__search">
+
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+      <div class="md-header__source">
+        <a href="https://github.com/<you>/profgpu" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    <you>/profgpu
+  </div>
+</a>
+      </div>
+
+  </nav>
+
+</header>
+
+    <div class="md-container" data-md-component="container">
+
+
+
+
+
+
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+
+
+
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="profgpu" class="md-nav__button md-logo" aria-label="profgpu" data-md-component="logo">
+
+
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    profgpu
+  </label>
+
+    <div class="md-nav__source">
+      <a href="https://github.com/<you>/profgpu" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    <you>/profgpu
+  </div>
+</a>
+    </div>
+
+  <ul class="md-nav__list" data-md-scrollfix>
+
+
+
+
+
+
+
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+
+
+
+  <span class="md-ellipsis">
+
+
+    Home
+
+
+
+  </span>
+
+
+
+      </a>
+    </li>
+
+
+
+
+
+
+
+
+
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+
+
+
+  <span class="md-ellipsis">
+
+
+    Installation
+
+
+
+  </span>
+
+
+
+      </a>
+    </li>
+
+
+
+
+
+
+
+
+
+    <li class="md-nav__item">
+      <a href="../quickstart/" class="md-nav__link">
+
+
+
+  <span class="md-ellipsis">
+
+
+    Quickstart
+
+
+
+  </span>
+
+
+
+      </a>
+    </li>
+
+
+
+
+
+
+
+
+
+
+
+    <li class="md-nav__item md-nav__item--active">
+
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+
+
+
+
+
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+
+
+
+  <span class="md-ellipsis">
+
+
+    Concepts
+
+
+
+  </span>
+
+
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+
+      <a href="./" class="md-nav__link md-nav__link--active">
+
+
+
+  <span class="md-ellipsis">
+
+
+    Concepts
+
+
+
+  </span>
+
+
+
+      </a>
+
+
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+
+
+
+
+
+
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+
+        <li class="md-nav__item">
+  <a href="#device-level-utilization-is-a-time-fraction" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Device-level utilization is a time fraction
+
+    </span>
+  </a>
+
+</li>
+
+        <li class="md-nav__item">
+  <a href="#why-sampling-interval-matters" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Why sampling interval matters
+
+    </span>
+  </a>
+
+</li>
+
+        <li class="md-nav__item">
+  <a href="#the-full-gpusummary" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        The full GpuSummary
+
+    </span>
+  </a>
+
+</li>
+
+        <li class="md-nav__item">
+  <a href="#the-busy-time-estimate" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        The "busy time estimate"
+
+    </span>
+  </a>
+
+</li>
+
+        <li class="md-nav__item">
+  <a href="#why-multiple-runs-matter" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Why multiple runs matter
+
+    </span>
+  </a>
+
+    <nav class="md-nav" aria-label="Why multiple runs matter">
+      <ul class="md-nav__list">
+
+          <li class="md-nav__item">
+  <a href="#using-repeats-and-warmup_runs" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Using repeats and warmup_runs
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#when-to-use-multi-run" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        When to use multi-run
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#when-single-run-is-fine" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        When single run is fine
+
+    </span>
+  </a>
+
+</li>
+
+      </ul>
+    </nav>
+
+</li>
+
+        <li class="md-nav__item">
+  <a href="#cuda-async-scheduling-why-sync_fn-exists" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        CUDA async scheduling: why sync_fn exists
+
+    </span>
+  </a>
+
+    <nav class="md-nav" aria-label="CUDA async scheduling: why sync_fn exists">
+      <ul class="md-nav__list">
+
+          <li class="md-nav__item">
+  <a href="#what-sync_fn-does" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        What sync_fn does
+
+    </span>
+  </a>
+
+</li>
+
+      </ul>
+    </nav>
+
+</li>
+
+        <li class="md-nav__item">
+  <a href="#warmup" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Warmup
+
+    </span>
+  </a>
+
+</li>
+
+        <li class="md-nav__item">
+  <a href="#multi-process-shared-gpus" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Multi-process / shared GPUs
+
+    </span>
+  </a>
+
+</li>
+
+        <li class="md-nav__item">
+  <a href="#interpreting-common-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Interpreting common patterns
+
+    </span>
+  </a>
+
+    <nav class="md-nav" aria-label="Interpreting common patterns">
+      <ul class="md-nav__list">
+
+          <li class="md-nav__item">
+  <a href="#low-utilgpu-but-slow-runtime" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Low util.gpu but slow runtime
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#high-utilgpu-but-low-throughput" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        High util.gpu but low throughput
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#high-idle_pct" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        High idle_pct
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#bursty-utilization-trace" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Bursty utilization trace
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#high-run-to-run-variance" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        High run-to-run variance
+
+    </span>
+  </a>
+
+</li>
+
+      </ul>
+    </nav>
+
+</li>
+
+        <li class="md-nav__item">
+  <a href="#what-utilmem-is-and-isnt" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        What util.mem is (and isn't)
+
+    </span>
+  </a>
+
+</li>
+
+    </ul>
+
+</nav>
+
+    </li>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+
+
+
+
+
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+
+
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+
+
+
+  <span class="md-ellipsis">
+
+
+    Tutorials
+
+
+
+  </span>
+
+
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+
+
+    Tutorials
+
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+
+
+
+
+
+
+
+    <li class="md-nav__item">
+      <a href="../tutorials/pytorch/" class="md-nav__link">
+
+
+
+  <span class="md-ellipsis">
+
+
+    PyTorch
+
+
+
+  </span>
+
+
+
+      </a>
+    </li>
+
+
+
+
+
+
+
+
+
+
+    <li class="md-nav__item">
+      <a href="../tutorials/cli/" class="md-nav__link">
+
+
+
+  <span class="md-ellipsis">
+
+
+    CLI
+
+
+
+  </span>
+
+
+
+      </a>
+    </li>
+
+
+
+
+
+
+
+
+
+
+    <li class="md-nav__item">
+      <a href="../tutorials/logging/" class="md-nav__link">
+
+
+
+  <span class="md-ellipsis">
+
+
+    Logging & Export
+
+
+
+  </span>
+
+
+
+      </a>
+    </li>
+
+
+
+
+          </ul>
+        </nav>
+
+    </li>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+
+
+
+
+
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+
+
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+
+
+
+  <span class="md-ellipsis">
+
+
+    Reports
+
+
+
+  </span>
+
+
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+
+
+    Reports
+
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+
+
+
+
+
+
+
+    <li class="md-nav__item">
+      <a href="../reports/enformer_gpu_profiling/" class="md-nav__link">
+
+
+
+  <span class="md-ellipsis">
+
+
+    Enformer GPU Profiling
+
+
+
+  </span>
+
+
+
+      </a>
+    </li>
+
+
+
+
+          </ul>
+        </nav>
+
+    </li>
+
+
+
+
+
+
+
+
+
+    <li class="md-nav__item">
+      <a href="../notebooks/" class="md-nav__link">
+
+
+
+  <span class="md-ellipsis">
+
+
+    Notebooks
+
+
+
+  </span>
+
+
+
+      </a>
+    </li>
+
+
+
+
+
+
+
+
+
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+
+
+
+  <span class="md-ellipsis">
+
+
+    API Reference
+
+
+
+  </span>
+
+
+
+      </a>
+    </li>
+
+
+
+
+
+
+
+
+
+    <li class="md-nav__item">
+      <a href="../troubleshooting/" class="md-nav__link">
+
+
+
+  <span class="md-ellipsis">
+
+
+    Troubleshooting
+
+
+
+  </span>
+
+
+
+      </a>
+    </li>
+
+
+
+
+
+
+
+
+
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+
+
+
+  <span class="md-ellipsis">
+
+
+    FAQ
+
+
+
+  </span>
+
+
+
+      </a>
+    </li>
+
+
+
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+
+
+
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+
+
+
+
+
+
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+
+        <li class="md-nav__item">
+  <a href="#device-level-utilization-is-a-time-fraction" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Device-level utilization is a time fraction
+
+    </span>
+  </a>
+
+</li>
+
+        <li class="md-nav__item">
+  <a href="#why-sampling-interval-matters" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Why sampling interval matters
+
+    </span>
+  </a>
+
+</li>
+
+        <li class="md-nav__item">
+  <a href="#the-full-gpusummary" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        The full GpuSummary
+
+    </span>
+  </a>
+
+</li>
+
+        <li class="md-nav__item">
+  <a href="#the-busy-time-estimate" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        The "busy time estimate"
+
+    </span>
+  </a>
+
+</li>
+
+        <li class="md-nav__item">
+  <a href="#why-multiple-runs-matter" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Why multiple runs matter
+
+    </span>
+  </a>
+
+    <nav class="md-nav" aria-label="Why multiple runs matter">
+      <ul class="md-nav__list">
+
+          <li class="md-nav__item">
+  <a href="#using-repeats-and-warmup_runs" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Using repeats and warmup_runs
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#when-to-use-multi-run" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        When to use multi-run
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#when-single-run-is-fine" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        When single run is fine
+
+    </span>
+  </a>
+
+</li>
+
+      </ul>
+    </nav>
+
+</li>
+
+        <li class="md-nav__item">
+  <a href="#cuda-async-scheduling-why-sync_fn-exists" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        CUDA async scheduling: why sync_fn exists
+
+    </span>
+  </a>
+
+    <nav class="md-nav" aria-label="CUDA async scheduling: why sync_fn exists">
+      <ul class="md-nav__list">
+
+          <li class="md-nav__item">
+  <a href="#what-sync_fn-does" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        What sync_fn does
+
+    </span>
+  </a>
+
+</li>
+
+      </ul>
+    </nav>
+
+</li>
+
+        <li class="md-nav__item">
+  <a href="#warmup" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Warmup
+
+    </span>
+  </a>
+
+</li>
+
+        <li class="md-nav__item">
+  <a href="#multi-process-shared-gpus" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Multi-process / shared GPUs
+
+    </span>
+  </a>
+
+</li>
+
+        <li class="md-nav__item">
+  <a href="#interpreting-common-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Interpreting common patterns
+
+    </span>
+  </a>
+
+    <nav class="md-nav" aria-label="Interpreting common patterns">
+      <ul class="md-nav__list">
+
+          <li class="md-nav__item">
+  <a href="#low-utilgpu-but-slow-runtime" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Low util.gpu but slow runtime
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#high-utilgpu-but-low-throughput" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        High util.gpu but low throughput
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#high-idle_pct" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        High idle_pct
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#bursty-utilization-trace" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Bursty utilization trace
+
+    </span>
+  </a>
+
+</li>
+
+          <li class="md-nav__item">
+  <a href="#high-run-to-run-variance" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        High run-to-run variance
+
+    </span>
+  </a>
+
+</li>
+
+      </ul>
+    </nav>
+
+</li>
+
+        <li class="md-nav__item">
+  <a href="#what-utilmem-is-and-isnt" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        What util.mem is (and isn't)
+
+    </span>
+  </a>
+
+</li>
+
+    </ul>
+
+</nav>
+                  </div>
+                </div>
+              </div>
+
+
+
+            <div class="md-content" data-md-component="content">
+
+              <article class="md-content__inner md-typeset">
+
+
+
+
+
+
+
+
+<h1 id="concepts">Concepts</h1>
+<p>This section explains what <code>profgpu</code> is (and is <strong>not</strong>) measuring, and why the defaults are the way they are.</p>
+<h2 id="device-level-utilization-is-a-time-fraction">Device-level utilization is a time fraction</h2>
+<p>Most GPU "utilization" counters reported by NVML / <code>nvidia-smi</code> are best interpreted as:</p>
+<blockquote>
+<p><strong>The fraction of time the device had at least one active workload in the last sampling window.</strong></p>
+</blockquote>
+<p>So if you see <code>util.gpu = 80%</code>, that often means:</p>
+<ul>
+<li>For ~80% of the last window, there were kernels running (or the graphics engine was active).</li>
+<li>For ~20% of the window, the device was idle.</li>
+</ul>
+<p>It does <strong>not</strong> guarantee anything about:</p>
+<ul>
+<li>how close you are to peak FLOPS</li>
+<li>whether kernels are compute-bound vs memory-bound</li>
+<li>whether you are saturating memory bandwidth</li>
+</ul>
+<p>To answer "how close am I to the hardware limit?", you typically need kernel-level profiling tools (Nsight Compute/Systems) or hardware counters beyond util%.</p>
+<h2 id="why-sampling-interval-matters">Why sampling interval matters</h2>
+<p>A utilization counter is a <em>statistic over time</em>. If your workload is bursty (short kernels separated by CPU work or I/O), then:</p>
+<ul>
+<li>With a long interval (e.g. 1s), bursts may be averaged out.</li>
+<li>With a short interval (e.g. 50ms), you can see bursts more clearly.</li>
+</ul>
+<p><code>profgpu</code> defaults to <code>interval_s=0.2</code> (200ms) because it's usually:</p>
+<ul>
+<li>fast enough to show "bursty vs steady" patterns</li>
+<li>slow enough to avoid noticeable overhead in most runs</li>
+</ul>
+<p>If you have micro-kernels or extremely bursty patterns, try <code>interval_s=0.05</code> or <code>0.1</code>.</p>
+<h2 id="the-full-gpusummary">The full GpuSummary</h2>
+<p>Each profiling session produces a <code>GpuSummary</code> with 30 fields grouped as:</p>
+<table>
+<thead>
+<tr>
+<th>Group</th>
+<th>What it tells you</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>GPU utilization</strong> (mean/std/min/max/p5/p50/p95/p99)</td>
+<td>How busy the GPU was - and how variable</td>
+</tr>
+<tr>
+<td><strong>idle_pct / active_pct</strong></td>
+<td>Quick classification: idle (&lt;5%) vs active (&gt;=50%)</td>
+</tr>
+<tr>
+<td><strong>Memory utilization</strong></td>
+<td>Memory-controller busyness</td>
+</tr>
+<tr>
+<td><strong>Device memory</strong> (mean/max/total/util_pct)</td>
+<td>How much VRAM you're using</td>
+</tr>
+<tr>
+<td><strong>Power</strong> (mean/max/energy_j)</td>
+<td>Watt draw and total energy consumed</td>
+</tr>
+<tr>
+<td><strong>Temperature</strong> (mean/max)</td>
+<td>Thermal state</td>
+</tr>
+<tr>
+<td><strong>Clocks</strong> (sm_mean/sm_max)</td>
+<td>Whether throttling occurred</td>
+</tr>
+<tr>
+<td><strong>Derived</strong> (busy_time_est, sparkline)</td>
+<td>Quick interpretations</td>
+</tr>
+</tbody>
+</table>
+<h2 id="the-busy-time-estimate">The "busy time estimate"</h2>
+<p>The summary reports:</p>
+<div class="highlight"><pre><span></span><code>busy_time_est_s = duration_s * mean(util.gpu)/100
+</code></pre></div>
+<p>This is a coarse estimate of <em>how much of the wall time the GPU was busy</em>, under the assumption that the utilization counter is representative.</p>
+<p>Common interpretations:</p>
+<ul>
+<li><strong>Busy time is close to duration</strong> --- the GPU is likely the bottleneck (or at least continuously active).</li>
+<li><strong>Busy time is much smaller than duration</strong> --- likely CPU/I/O bottlenecks, data loading, synchronization gaps, or very small kernels.</li>
+</ul>
+<h2 id="why-multiple-runs-matter">Why multiple runs matter</h2>
+<p>A single profiling run gives you one sample of GPU behavior. That sample is affected by:</p>
+<ul>
+<li>CUDA context initialization / JIT warmup</li>
+<li>OS scheduling jitter</li>
+<li>Thermal throttling (the GPU heats up during the run)</li>
+<li>Background processes</li>
+<li>Memory allocator behavior</li>
+</ul>
+<p>Running the same workload multiple times gives you:</p>
+<ul>
+<li><strong>Mean</strong>: a more stable estimate of typical behavior</li>
+<li><strong>Std</strong>: how much run-to-run variation exists</li>
+<li><strong>Min/Max</strong>: best-case and worst-case across runs</li>
+</ul>
+<h3 id="using-repeats-and-warmup_runs">Using <code>repeats</code> and <code>warmup_runs</code></h3>
+<div class="highlight"><pre><span></span><code><span class="nd">@gpu_profile</span><span class="p">(</span><span class="n">repeats</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">warmup_runs</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">return_profile</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">bench</span><span class="p">():</span>
+    <span class="o">...</span>
+</code></pre></div>
+<ul>
+<li><code>warmup_runs=1</code>: the first run is executed but its results are discarded (handles JIT, cache warmup)</li>
+<li><code>repeats=5</code>: the next 5 runs are measured and aggregated</li>
+</ul>
+<p>The result is a <code>MultiRunResult</code> with pre-computed <code>RunStats</code> for duration, utilization, power, energy, peak memory, and peak temperature. You can also compute stats for any <code>GpuSummary</code> field with <code>result.stats_for("field_name")</code>.</p>
+<h3 id="when-to-use-multi-run">When to use multi-run</h3>
+<ul>
+<li><strong>Benchmarking</strong>: always use multiple runs to report mean +- std</li>
+<li><strong>Comparing configurations</strong>: without variance estimates, a 2% difference might be noise</li>
+<li><strong>Tracking regressions</strong>: compute confidence intervals from multi-run results</li>
+<li><strong>Short workloads</strong>: more sensitive to startup overhead, so run-to-run variance is higher</li>
+</ul>
+<h3 id="when-single-run-is-fine">When single run is fine</h3>
+<ul>
+<li><strong>Long training jobs</strong>: variance within the run dominates run-to-run variance</li>
+<li><strong>Quick debugging</strong>: just checking "is the GPU being used at all?"</li>
+</ul>
+<h2 id="cuda-async-scheduling-why-sync_fn-exists">CUDA async scheduling: why <code>sync_fn</code> exists</h2>
+<p>Frameworks like PyTorch and CuPy generally schedule GPU work asynchronously:</p>
+<ul>
+<li>your Python code queues kernels to the GPU</li>
+<li>the CPU thread continues without waiting</li>
+</ul>
+<p>That means a function can return before the GPU finishes the work it launched.</p>
+<h3 id="what-sync_fn-does">What <code>sync_fn</code> does</h3>
+<p><code>profgpu</code> can call a synchronization function <strong>before and after</strong> the profiled region:</p>
+<ul>
+<li>before: flush previously queued work so you don't "inherit" earlier activity</li>
+<li>after: wait for queued work so the region includes what you launched</li>
+</ul>
+<p>For PyTorch, pass:</p>
+<div class="highlight"><pre><span></span><code><span class="n">sync_fn</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">synchronize</span>
+</code></pre></div>
+<p>For CuPy, pass:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">cupy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">cp</span>
+<span class="n">sync_fn</span> <span class="o">=</span> <span class="n">cp</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">Stream</span><span class="o">.</span><span class="n">null</span><span class="o">.</span><span class="n">synchronize</span>
+</code></pre></div>
+<p>If you don't set <code>sync_fn</code>, the measurements are still useful for <em>long-running loops</em> (where the GPU is active throughout), but can mislead for short regions.</p>
+<h2 id="warmup">Warmup</h2>
+<p>Many workloads have warmup effects:</p>
+<ul>
+<li>CUDA context init</li>
+<li>kernel autotuning</li>
+<li>first batch caches</li>
+<li>JIT compilation (Triton/torch.compile)</li>
+</ul>
+<p>There are two levels of warmup in <code>profgpu</code>:</p>
+<ol>
+<li><strong><code>warmup_s</code></strong> (per-run): Ignore early samples within a single run. Handles in-run warmup effects.</li>
+<li><strong><code>warmup_runs</code></strong> (multi-run): Discard entire initial runs. Handles cross-run warmup effects like JIT compilation.</li>
+</ol>
+<div class="highlight"><pre><span></span><code><span class="c1"># warmup_s: ignore first 0.5s of samples WITHIN each run</span>
+<span class="nd">@gpu_profile</span><span class="p">(</span><span class="n">warmup_s</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+
+<span class="c1"># warmup_runs: discard entire first run, measure the next 5</span>
+<span class="nd">@gpu_profile</span><span class="p">(</span><span class="n">repeats</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">warmup_runs</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="c1"># combine both for maximum accuracy</span>
+<span class="nd">@gpu_profile</span><span class="p">(</span><span class="n">repeats</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">warmup_runs</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">warmup_s</span><span class="o">=</span><span class="mf">0.2</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="multi-process-shared-gpus">Multi-process / shared GPUs</h2>
+<p>NVML and <code>nvidia-smi</code> utilization counters are <strong>device-level</strong>. If multiple processes use the same GPU, the counter reflects the combined activity.</p>
+<p>If you need per-process attribution, you typically need:</p>
+<ul>
+<li>the GPU scheduler/driver metrics (limited)</li>
+<li>DCGM-based accounting</li>
+<li>or application-level instrumentation</li>
+</ul>
+<p><code>profgpu</code> intentionally focuses on "is the device busy?" rather than perfect attribution.</p>
+<h2 id="interpreting-common-patterns">Interpreting common patterns</h2>
+<h3 id="low-utilgpu-but-slow-runtime">Low util.gpu but slow runtime</h3>
+<p>Common causes:</p>
+<ul>
+<li>input pipeline/data loader bottleneck</li>
+<li>CPU preprocessing dominates</li>
+<li>frequent synchronization points</li>
+<li>too-small batches</li>
+<li>lots of host-to-device transfers</li>
+</ul>
+<h3 id="high-utilgpu-but-low-throughput">High util.gpu but low throughput</h3>
+<p>Common causes:</p>
+<ul>
+<li>memory-bandwidth bound kernels</li>
+<li>kernel launch overhead dominating (many tiny kernels)</li>
+<li>power/thermal throttling (watch <code>sm_clock_mean_mhz</code> vs <code>sm_clock_max_mhz</code> and <code>temp_max_c</code>)</li>
+</ul>
+<h3 id="high-idle_pct">High idle_pct</h3>
+<p>If <code>idle_pct</code> is high (many samples below 5% util), the GPU is frequently idle. Look for:</p>
+<ul>
+<li>data loading gaps</li>
+<li>synchronization barriers</li>
+<li>CPU bottlenecks between GPU kernels</li>
+</ul>
+<h3 id="bursty-utilization-trace">Bursty utilization trace</h3>
+<p>Often indicates:</p>
+<ul>
+<li>intermittent GPU work (e.g. per-batch) with gaps</li>
+<li>CPU/data pipeline not feeding GPU continuously</li>
+</ul>
+<h3 id="high-run-to-run-variance">High run-to-run variance</h3>
+<p>If <code>result.util_gpu.std</code> is large across multi-run benchmarks:</p>
+<ul>
+<li>thermal throttling may be kicking in on later runs</li>
+<li>OS scheduling is inconsistent</li>
+<li>memory allocator behavior differs between runs</li>
+<li>consider longer warmup_runs</li>
+</ul>
+<h2 id="what-utilmem-is-and-isnt">What <code>util.mem</code> is (and isn't)</h2>
+<p><code>util.mem</code> is typically a memory-controller utilization percentage. It can hint that you are memory-bound, but it is not a direct measure of achieved GB/s.</p>
+<p>To measure achieved bandwidth you typically need more detailed counters.</p>
+<hr />
+<p>If you want to <em>debug</em> a pattern you see in the utilization trace, the next step is often to correlate with:</p>
+<ul>
+<li>CPU utilization</li>
+<li>data loader timings</li>
+<li>kernel-level profiling (Nsight)</li>
+</ul>
+<p>The <a href="../tutorials/pytorch/">PyTorch tutorial</a> includes concrete examples.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+              </article>
+            </div>
+
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+
+      </main>
+
+        <footer class="md-footer">
+
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+
+
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+
+</div>
+
+    </div>
+  </div>
+</footer>
+
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+
+
+
+
+
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+
+
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+
+  </body>
+</html>
