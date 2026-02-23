@@ -1,0 +1,1226 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Programmatic GPU utilization profiling (decorator + context manager + CLI)">
+      
+      
+      
+      
+        <link rel="prev" href="../installation/">
+      
+      
+        <link rel="next" href="../concepts/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.2">
+    
+    
+      
+        <title>Quickstart - profgpu</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#quickstart" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="profgpu" class="md-header__button md-logo" aria-label="profgpu" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            profgpu
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Quickstart
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/<you>/profgpu" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    <you>/profgpu
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="profgpu" class="md-nav__button md-logo" aria-label="profgpu" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    profgpu
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/<you>/profgpu" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    <you>/profgpu
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-decorator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1) Decorator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1) Decorator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cuda-async-frameworks-pytorchcupy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CUDA async frameworks (PyTorch/CuPy)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-context-manager" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2) Context manager
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-get-results-programmatically-no-printing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3) Get results programmatically (no printing)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-use-a-custom-report-function-logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4) Use a custom report function (logging)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-cli-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5) CLI usage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-multi-run-benchmarking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6) Multi-run benchmarking
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6) Multi-run benchmarking">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#with-the-decorator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        With the decorator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#with-profile_repeats-non-decorator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        With profile_repeats (non-decorator)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#accessing-any-field-across-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Accessing any field across runs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-what-the-numbers-mean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7) What the numbers mean
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/pytorch/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PyTorch
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/logging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Logging & Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reports
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reports/enformer_gpu_profiling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Enformer GPU Profiling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-decorator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1) Decorator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1) Decorator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cuda-async-frameworks-pytorchcupy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CUDA async frameworks (PyTorch/CuPy)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-context-manager" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2) Context manager
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-get-results-programmatically-no-printing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3) Get results programmatically (no printing)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-use-a-custom-report-function-logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4) Use a custom report function (logging)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-cli-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5) CLI usage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-multi-run-benchmarking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6) Multi-run benchmarking
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6) Multi-run benchmarking">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#with-the-decorator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        With the decorator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#with-profile_repeats-non-decorator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        With profile_repeats (non-decorator)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#accessing-any-field-across-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Accessing any field across runs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-what-the-numbers-mean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7) What the numbers mean
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="quickstart">Quickstart</h1>
+<p>This page shows the most common usage patterns:</p>
+<ul>
+<li>Decorator: profile a function.</li>
+<li>Context manager: profile a block.</li>
+<li>CLI: profile an external command.</li>
+<li>Structured reporting: capture results in code.</li>
+<li>Multi-run benchmarking: estimate variance across repeated runs.</li>
+</ul>
+<h2 id="1-decorator">1) Decorator</h2>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">profgpu</span><span class="w"> </span><span class="kn">import</span> <span class="n">gpu_profile</span>
+
+<span class="nd">@gpu_profile</span><span class="p">(</span><span class="n">interval_s</span><span class="o">=</span><span class="mf">0.2</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">work</span><span class="p">():</span>
+    <span class="o">...</span>  <span class="c1"># GPU work</span>
+    <span class="k">return</span> <span class="mi">123</span>
+
+<span class="n">value</span> <span class="o">=</span> <span class="n">work</span><span class="p">()</span>
+</code></pre></div>
+<p>At the end of the call, a one-page summary is printed to stdout.</p>
+<h3 id="cuda-async-frameworks-pytorchcupy">CUDA async frameworks (PyTorch/CuPy)</h3>
+<p>Many GPU frameworks schedule work asynchronously; the Python function can return <em>before</em> the GPU has finished.</p>
+<p>If you want "the function call" to include queued GPU work, pass a synchronization function:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">profgpu</span><span class="w"> </span><span class="kn">import</span> <span class="n">gpu_profile</span>
+
+<span class="nd">@gpu_profile</span><span class="p">(</span><span class="n">interval_s</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">sync_fn</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">synchronize</span><span class="p">,</span> <span class="n">warmup_s</span><span class="o">=</span><span class="mf">0.2</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">bench</span><span class="p">():</span>
+    <span class="n">a</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">8192</span><span class="p">,</span> <span class="mi">8192</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">8192</span><span class="p">,</span> <span class="mi">8192</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">):</span>
+        <span class="n">_</span> <span class="o">=</span> <span class="n">a</span> <span class="o">@</span> <span class="n">b</span>
+
+<span class="n">bench</span><span class="p">()</span>
+</code></pre></div>
+<h2 id="2-context-manager">2) Context manager</h2>
+<p>Use the context manager when you want to profile arbitrary blocks of code:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">profgpu</span><span class="w"> </span><span class="kn">import</span> <span class="n">GpuMonitor</span>
+
+<span class="k">with</span> <span class="n">GpuMonitor</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">interval_s</span><span class="o">=</span><span class="mf">0.2</span><span class="p">)</span> <span class="k">as</span> <span class="n">mon</span><span class="p">:</span>
+    <span class="o">...</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">mon</span><span class="o">.</span><span class="n">summary</span><span class="o">.</span><span class="n">format</span><span class="p">())</span>
+</code></pre></div>
+<h2 id="3-get-results-programmatically-no-printing">3) Get results programmatically (no printing)</h2>
+<p>Set <code>report=False</code> to disable printing, and <code>return_profile=True</code> to get a structured result:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">profgpu</span><span class="w"> </span><span class="kn">import</span> <span class="n">gpu_profile</span>
+
+<span class="nd">@gpu_profile</span><span class="p">(</span><span class="n">report</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">return_profile</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">work</span><span class="p">():</span>
+    <span class="o">...</span>
+    <span class="k">return</span> <span class="mi">123</span>
+
+<span class="n">res</span> <span class="o">=</span> <span class="n">work</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">gpu</span><span class="o">.</span><span class="n">util_gpu_mean</span><span class="p">,</span> <span class="n">res</span><span class="o">.</span><span class="n">gpu</span><span class="o">.</span><span class="n">util_gpu_p95</span><span class="p">)</span>
+</code></pre></div>
+<p>The result is a <code>ProfiledResult(value=..., gpu=GpuSummary(...))</code>.</p>
+<h2 id="4-use-a-custom-report-function-logging">4) Use a custom report function (logging)</h2>
+<p>The <code>report</code> parameter can also be a callable. It receives a <code>GpuSummary</code> (single run) or <code>MultiRunResult</code> (multi-run).</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">profgpu</span><span class="w"> </span><span class="kn">import</span> <span class="n">gpu_profile</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">write_jsonl</span><span class="p">(</span><span class="n">summary</span><span class="p">):</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;gpu_stats.jsonl&quot;</span><span class="p">,</span> <span class="s2">&quot;a&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">summary</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="nd">@gpu_profile</span><span class="p">(</span><span class="n">report</span><span class="o">=</span><span class="n">write_jsonl</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">work</span><span class="p">():</span>
+    <span class="o">...</span>
+
+<span class="n">work</span><span class="p">()</span>
+</code></pre></div>
+<h2 id="5-cli-usage">5) CLI usage</h2>
+<p>Profile an external command:</p>
+<div class="highlight"><pre><span></span><code>profgpu<span class="w"> </span>--device<span class="w"> </span><span class="m">0</span><span class="w"> </span>--interval<span class="w"> </span><span class="m">0</span>.2<span class="w"> </span>--<span class="w"> </span>python<span class="w"> </span>train.py<span class="w"> </span>--epochs<span class="w"> </span><span class="m">3</span>
+</code></pre></div>
+<p>Emit JSON:</p>
+<div class="highlight"><pre><span></span><code>profgpu<span class="w"> </span>--json<span class="w"> </span>--<span class="w"> </span>python<span class="w"> </span>train.py
+</code></pre></div>
+<p>Multi-run from CLI:</p>
+<div class="highlight"><pre><span></span><code>profgpu<span class="w"> </span>--repeats<span class="w"> </span><span class="m">5</span><span class="w"> </span>--warmup-runs<span class="w"> </span><span class="m">1</span><span class="w"> </span>--<span class="w"> </span>python<span class="w"> </span>train.py
+</code></pre></div>
+<p>See <a href="../tutorials/cli/">CLI Tutorial</a> for patterns like profiling shell pipelines and handling exit codes.</p>
+<h2 id="6-multi-run-benchmarking">6) Multi-run benchmarking</h2>
+<p>A single run can be noisy. Use <code>repeats</code> to run your function multiple times and get cross-run statistics (mean, std, min, max):</p>
+<h3 id="with-the-decorator">With the decorator</h3>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">profgpu</span><span class="w"> </span><span class="kn">import</span> <span class="n">gpu_profile</span>
+
+<span class="nd">@gpu_profile</span><span class="p">(</span><span class="n">repeats</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">warmup_runs</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">return_profile</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">report</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">train_epoch</span><span class="p">():</span>
+    <span class="o">...</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">train_epoch</span><span class="p">()</span>  <span class="c1"># MultiRunResult</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;util.gpu: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">util_gpu</span><span class="o">.</span><span class="n">mean</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">% +- </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">util_gpu</span><span class="o">.</span><span class="n">std</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">%&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;duration: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">duration</span><span class="o">.</span><span class="n">mean</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">s +- </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">duration</span><span class="o">.</span><span class="n">std</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">s&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;energy:   </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">energy</span><span class="o">.</span><span class="n">mean</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> J&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="with-profile_repeats-non-decorator">With <code>profile_repeats</code> (non-decorator)</h3>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">profgpu</span><span class="w"> </span><span class="kn">import</span> <span class="n">profile_repeats</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">profile_repeats</span><span class="p">(</span>
+    <span class="k">lambda</span><span class="p">:</span> <span class="n">my_function</span><span class="p">(</span><span class="n">arg1</span><span class="p">,</span> <span class="n">arg2</span><span class="p">),</span>
+    <span class="n">repeats</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+    <span class="n">warmup_runs</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">interval_s</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">format</span><span class="p">())</span>  <span class="c1"># human-friendly summary</span>
+</code></pre></div>
+<h3 id="accessing-any-field-across-runs">Accessing any field across runs</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Pre-computed stats for the most common metrics:</span>
+<span class="n">result</span><span class="o">.</span><span class="n">duration</span>      <span class="c1"># RunStats for duration_s</span>
+<span class="n">result</span><span class="o">.</span><span class="n">util_gpu</span>      <span class="c1"># RunStats for util_gpu_mean</span>
+<span class="n">result</span><span class="o">.</span><span class="n">power</span>         <span class="c1"># RunStats for power_mean_w</span>
+<span class="n">result</span><span class="o">.</span><span class="n">energy</span>        <span class="c1"># RunStats for energy_j</span>
+<span class="n">result</span><span class="o">.</span><span class="n">peak_memory</span>   <span class="c1"># RunStats for mem_used_max_mb</span>
+<span class="n">result</span><span class="o">.</span><span class="n">peak_temp</span>     <span class="c1"># RunStats for temp_max_c</span>
+
+<span class="c1"># On-demand stats for any GpuSummary field:</span>
+<span class="n">idle</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">stats_for</span><span class="p">(</span><span class="s2">&quot;idle_pct&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;idle: </span><span class="si">{</span><span class="n">idle</span><span class="o">.</span><span class="n">mean</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">% +- </span><span class="si">{</span><span class="n">idle</span><span class="o">.</span><span class="n">std</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">%&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="7-what-the-numbers-mean">7) What the numbers mean</h2>
+<p>The key metric is <strong>device-level</strong> <code>util.gpu</code>:</p>
+<ul>
+<li><code>util_gpu_mean</code> --- % of time the GPU was busy (averaged across samples)</li>
+<li><code>util_gpu_std</code> --- standard deviation of per-sample utilization</li>
+<li><code>idle_pct</code> --- fraction of samples where GPU util &lt; 5%</li>
+<li><code>active_pct</code> --- fraction of samples where GPU util &gt;= 50%</li>
+<li><code>util_mem_mean</code> --- memory-controller utilization</li>
+</ul>
+<p>The summary includes mean/std/min/max/p5/p50/p95/p99 percentiles, plus:</p>
+<div class="highlight"><pre><span></span><code>busy_time_est_s = duration_s * (util_gpu_mean / 100)
+</code></pre></div>
+<p>For deeper interpretation, see <a href="../concepts/">Concepts</a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
